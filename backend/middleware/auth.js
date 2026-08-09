@@ -1,11 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
-
-// In production, refuse to authenticate if the secret is the dev fallback
-if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || JWT_SECRET === 'dev-jwt-secret-do-not-use-in-production')) {
-  console.error('FATAL: JWT_SECRET is not configured. Authentication will fail.');
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
 }
 
 async function authenticate(req, res, next) {

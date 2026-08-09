@@ -2,6 +2,12 @@ const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadB
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // MinIO is fully S3-compatible. We use the AWS SDK v3 with custom endpoint.
+const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
+const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
+if (!MINIO_ACCESS_KEY || !MINIO_SECRET_KEY) {
+  throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables are required');
+}
+
 const endpoint = process.env.MINIO_USE_SSL === 'true'
   ? `https://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}`
   : `http://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}`;
@@ -10,8 +16,8 @@ const s3Client = new S3Client({
   region: 'us-east-1', // MinIO ignores this but AWS SDK requires it
   endpoint,
   credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
-    secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
+    accessKeyId: MINIO_ACCESS_KEY,
+    secretAccessKey: MINIO_SECRET_KEY,
   },
   forcePathStyle: true, // Required for MinIO (path-style, not virtual-host)
 });

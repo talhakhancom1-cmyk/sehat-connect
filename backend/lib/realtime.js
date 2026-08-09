@@ -17,7 +17,10 @@
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 
 // Map of user_id -> Set(socket.id) for presence + direct delivery
 const onlineUsers = new Map();

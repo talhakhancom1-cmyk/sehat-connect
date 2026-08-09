@@ -13,7 +13,10 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
 });
 
-const DOWNLOAD_SECRET = process.env.FILE_DOWNLOAD_SECRET || 'dev-file-download-secret-do-not-use-in-production';
+const DOWNLOAD_SECRET = process.env.FILE_DOWNLOAD_SECRET;
+if (!DOWNLOAD_SECRET) {
+  throw new Error('FILE_DOWNLOAD_SECRET environment variable is required');
+}
 
 function signDownloadToken(fileId) {
   return crypto.createHmac('sha256', DOWNLOAD_SECRET).update(fileId).digest('hex');

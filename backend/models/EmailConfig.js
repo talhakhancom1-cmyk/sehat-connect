@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
+const { encrypt, decrypt } = require('../lib/crypto');
 
 const EmailConfig = sequelize.define('EmailConfig', {
   id: {
@@ -24,7 +25,7 @@ const EmailConfig = sequelize.define('EmailConfig', {
     type: DataTypes.STRING,
     allowNull: false
   },
-  // Encrypted at rest via the app layer (see hooks below)
+  // Encrypted at rest via AES-256-GCM (see hooks below)
   smtp_password: {
     type: DataTypes.TEXT,
     allowNull: false
@@ -85,7 +86,41 @@ const EmailConfig = sequelize.define('EmailConfig', {
   tableName: 'email_configs',
   timestamps: true,
   createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  updatedAt: 'updated_at',
+  hooks: {
+    beforeSave: (record) => {
+      // Encrypt the password before writing to DB (only if it changed and isn't already encrypted)
+      if (record.changed('smtp_password') && record.smtp_password) {
+        const val = record.smtp_password;
+        // Don't double-encrypt (already encrypted values contain ':')
+        if (!val.includes(':') || val.length < 100) {
+          try {
+            record.smtp_password = encrypt(val);
+            record.dataValues.smtp_password = record.smtp_password;
+          } catch (e) {
+            console.error('EmailConfig: failed to encrypt smtp_password:', e.message);
+          }
+        }
+      }
+    },
+    afterFind: (result) => {
+      // Decrypt the password after reading from DB
+      const decryptOne = (record) => {
+        if (record && record.smtp_password) {
+          const decrypted = decrypt(record.smtp_password);
+          if (decrypted !== null) {
+            record.smtp_password = decrypted;
+            record.dataValues.smtp_password = decrypted;
+          }
+        }
+      };
+      if (Array.isArray(result)) {
+        result.forEach(decryptOne);
+      } else if (result) {
+        decryptOne(result);
+      }
+    }
+  }
 });
 
 module.exports = EmailConfig;

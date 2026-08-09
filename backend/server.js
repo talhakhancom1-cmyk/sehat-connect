@@ -33,10 +33,17 @@ app.use(helmet({
   contentSecurityPolicy: false, // Frontend is served by Nginx, not Express
 }));
 
-// CORS — locked to allowed origins
-const corsOrigin = process.env.CORS_ORIGIN || '*';
+// CORS — locked to allowed origins (fail in production if not configured)
+const corsOrigin = process.env.CORS_ORIGIN;
+if (!corsOrigin || corsOrigin === '*') {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: CORS_ORIGIN must be set to specific origins in production');
+    process.exit(1);
+  }
+  console.warn('WARNING: CORS_ORIGIN not set, allowing all origins (development only)');
+}
 app.use(cors({
-  origin: corsOrigin === '*' ? true : corsOrigin.split(',').map(s => s.trim()),
+  origin: (!corsOrigin || corsOrigin === '*') ? true : corsOrigin.split(',').map(s => s.trim()),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -60,8 +67,8 @@ const generalLimiter = rateLimit({
   message: { error: 'Too many requests, please slow down.' },
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Migrate role columns from legacy PostgreSQL enums to strings
 const migrateRoleColumns = async () => {

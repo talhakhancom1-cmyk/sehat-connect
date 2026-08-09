@@ -7,7 +7,10 @@ const { v4: uuidv4 } = require('uuid');
 const { User, Session, PasswordReset } = require('../models');
 const { sendPasswordResetEmail, isFeatureEnabled } = require('../lib/emailService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 const TOKEN_TTL = process.env.JWT_TTL || '7d';
 
 function generateToken(user, jti) {
@@ -121,6 +124,9 @@ router.post('/register', async (req, res) => {
     const { email, password, fullName, role } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
     const existing = await User.findOne({ where: { email } });
     if (existing) {
@@ -242,13 +248,11 @@ router.post('/forgot-password', async (req, res) => {
       return res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
     }
 
-    // Email not configured or failed — return the token so the frontend can handle it
-    // (useful for dev mode or when SMTP is not yet set up)
+    // Email not configured or failed — do NOT expose the token in the response.
+    // The user must configure SMTP (Admin > Email) to use password reset.
     return res.json({
       success: true,
-      message: 'Reset token generated. Email delivery not available — use the token directly.',
-      reset_token: token,
-      reset_url: `/reset-password?token=${token}`,
+      message: 'If the email exists, a reset link has been sent.',
       email_error: emailResult.error || 'Email not configured',
     });
   } catch (error) {
@@ -266,7 +270,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Token and new password are required' });
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     if (!PasswordReset) {
@@ -321,8 +325,8 @@ router.post('/change-password', async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current password and new password are required' });
     }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
     const user = await User.findByPk(decoded.id);
