@@ -9,9 +9,11 @@ const { pickFields } = require('../lib/pickFields');
 
 // Fields that can be set on a MedicalRecord
 const RECORD_WRITABLE_FIELDS = [
-  'patient_id', 'title', 'category', 'type', 'date', 'doctor_name',
-  'facility', 'description', 'file_url', 'file_type', 'file_size',
-  'tags', 'provenance', 'source', 'is_shared', 'status'
+  'patient_id', 'patient_name', 'title', 'category', 'type', 'date',
+  'date_precision', 'doctor_name', 'hospital', 'source_hospital', 'notes',
+  'description', 'file_url', 'file_type', 'file_size',
+  'tags', 'provenance', 'source', 'is_shared', 'is_draft', 'status',
+  'consent_id', 'encounter_id', 'verification_status'
 ];
 
 function isAdmin(user) {
@@ -63,6 +65,10 @@ router.post('/', authenticate, async (req, res) => {
     const body = pickFields(req.body, RECORD_WRITABLE_FIELDS);
     if (!isAdmin(req.user)) {
       body.patient_id = req.user.id;
+      // Auto-fill patient_name from the authenticated user if not provided
+      if (!body.patient_name) {
+        body.patient_name = req.user.display_name || req.user.full_name || req.user.email || 'Patient';
+      }
     }
     const record = await MedicalRecord.create(body);
     res.status(201).json(record);
