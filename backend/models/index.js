@@ -6,6 +6,7 @@ const Device = require('./Device');
 const Session = require('./Session');
 const PasswordReset = require('./PasswordReset');
 const ApiKey = require('./ApiKey');
+const EmailConfig = require('./EmailConfig');
 const MfaFactor = require('./MfaFactor');
 const DoctorCredential = require('./DoctorCredential');
 const Organization = require('./Organization');
@@ -72,6 +73,9 @@ PasswordReset.belongsTo(User, { foreignKey: 'user_id', constraints: false });
 
 User.hasMany(ApiKey, { foreignKey: 'created_by_user_id', as: 'apiKeys', constraints: false });
 ApiKey.belongsTo(User, { foreignKey: 'created_by_user_id', as: 'creator', constraints: false });
+
+User.hasMany(EmailConfig, { foreignKey: 'updated_by_user_id', as: 'emailConfigs', constraints: false });
+EmailConfig.belongsTo(User, { foreignKey: 'updated_by_user_id', as: 'updater', constraints: false });
 
 User.hasMany(MfaFactor, { foreignKey: 'user_id', constraints: false });
 MfaFactor.belongsTo(User, { foreignKey: 'user_id', constraints: false });
@@ -212,6 +216,7 @@ module.exports = {
   Session,
   PasswordReset,
   ApiKey,
+  EmailConfig,
   MfaFactor,
   DoctorCredential,
   Organization,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, FileText, Calendar, MessageSquare, LayoutGrid, CalendarDays, Users, Stethoscope, Activity, ShieldCheck, ClipboardList, Pill, ClipboardCheck, CalendarClock, UploadCloud, IdCard, QrCode, UsersRound, Bell, Globe, Radar, KeyRound } from 'lucide-react';
+import { Home, FileText, Calendar, MessageSquare, LayoutGrid, CalendarDays, Users, Stethoscope, Activity, ShieldCheck, ClipboardList, Pill, ClipboardCheck, CalendarClock, UploadCloud, IdCard, QrCode, UsersRound, Bell, Globe, Radar, KeyRound, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PartnerCredit from '@/components/PartnerCredit';
 
@@ -39,6 +39,7 @@ export const adminNav = [
   { label: 'Country Config', path: '/admin/config', icon: Globe },
   { label: 'Tracking Pixels', path: '/admin/pixels', icon: Radar },
   { label: 'API Keys', path: '/admin/api-keys', icon: KeyRound },
+  { label: 'Email / SMTP', path: '/admin/email', icon: Mail },
 ];
 
 export default function Sidebar({ role = 'patient' }) {

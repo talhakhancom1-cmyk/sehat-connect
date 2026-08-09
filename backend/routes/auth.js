@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { User, Session, PasswordReset } = require('../models');
+const { sendPasswordResetEmail, isFeatureEnabled } = require('../lib/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
 const TOKEN_TTL = process.env.JWT_TTL || '7d';
@@ -216,20 +217,27 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // TODO: Send email with reset link when email service is configured
-    // For now, return the token so the frontend can build the reset URL
-    if (process.env.NODE_ENV !== 'production' || !process.env.EMAIL_SERVICE) {
-      return res.json({
-        success: true,
-        message: 'Reset token generated.',
-        reset_token: token,
-        reset_url: `/reset-password?token=${token}`
-      });
+    // Try to send the reset email via configured SMTP
+    const resetUrl = `${req.headers.origin || req.headers.referer || ''}/reset-password?token=${token}`;
+    const emailEnabled = await isFeatureEnabled('enable_password_reset');
+    const emailResult = emailEnabled
+      ? await sendPasswordResetEmail(user.email, resetUrl, token)
+      : { success: false };
+
+    if (emailResult.success) {
+      // Email sent — don't expose the token
+      return res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
     }
 
-    // In production with email service, send email and don't return token
-    // await sendEmail(user.email, 'Password Reset', `Click here: ${resetUrl}`);
-    res.json({ success: true, message: 'If the email exists, a reset link has been sent.' });
+    // Email not configured or failed — return the token so the frontend can handle it
+    // (useful for dev mode or when SMTP is not yet set up)
+    return res.json({
+      success: true,
+      message: 'Reset token generated. Email delivery not available — use the token directly.',
+      reset_token: token,
+      reset_url: `/reset-password?token=${token}`,
+      email_error: emailResult.error || 'Email not configured',
+    });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ error: error.message });
