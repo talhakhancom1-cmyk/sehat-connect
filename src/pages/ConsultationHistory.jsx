@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import StatusBadge from '@/components/StatusBadge';
 import { Search, FileText, ChevronRight, Video, Phone, MessageSquare, Building2, Home, Pill, Stethoscope, Calendar, Clock, ClipboardCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatAppointmentDate } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 
 const typeIcons = {
@@ -111,7 +111,7 @@ export default function ConsultationHistory() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{appt.doctor_name}</p>
                       <p className="text-[11px] text-muted-foreground font-mono">
-                        {appt.appointment_date} · {appt.time_slot}
+                        {formatAppointmentDate(appt.appointment_date)} · {appt.time_slot}
                       </p>
                     </div>
                     <ChevronRight className={cn('w-4 h-4 shrink-0 transition-colors', isSel ? 'text-primary' : 'text-muted-foreground')} />
@@ -149,7 +149,7 @@ export default function ConsultationHistory() {
                   <h2 className="text-lg font-semibold">{selected.doctor_name}</h2>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground font-mono">
                     <Calendar className="w-3.5 h-3.5" />
-                    {selected.appointment_date} · {selected.time_slot}
+                    {formatAppointmentDate(selected.appointment_date)} · {selected.time_slot}
                     <span>·</span>
                     <Clock className="w-3.5 h-3.5" />
                     <span className="capitalize">{selected.type} consultation</span>

@@ -8,6 +8,29 @@ const dayMap = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const defaultSlots = ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'];
 
+// Convert a slot string like "01:30 PM" to minutes since midnight for comparison
+function slotToMinutes(slot) {
+  if (!slot) return -1;
+  const m = slot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return -1;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+// Check if a slot falls within a break window [breakStart, breakEnd)
+function isSlotInBreak(slot, breakStart, breakEnd) {
+  if (!breakStart || !breakEnd) return false;
+  const s = slotToMinutes(slot);
+  const bs = slotToMinutes(breakStart);
+  const be = slotToMinutes(breakEnd);
+  if (s < 0 || bs < 0 || be < 0) return false;
+  return s >= bs && s < be;
+}
+
 const typeIcons = {
   video: Video, audio: Phone, chat: MessageSquare, physical: Building2, home: Home,
 };
@@ -75,7 +98,21 @@ export default function BookingModal({ doctor, onClose, onConfirm }) {
     const dayKey = dayMap[date.getDay()];
     const daySchedule = schedule.days?.find(d => d.day === dayKey);
     if (!daySchedule || !daySchedule.enabled) return [];
-    return daySchedule.slots || [];
+    const slots = daySchedule.slots || [];
+    // Filter out slots that fall within the doctor's break window.
+    // Supports both the recurring break (schedule.break_start/break_end) and
+    // per-day breaks (schedule.day_breaks = [{ date, start, end }]).
+    const breakStart = schedule.break_start;
+    const breakEnd = schedule.break_end;
+    const dayBreaks = Array.isArray(schedule.day_breaks) ? schedule.day_breaks : [];
+    const matchingDayBreak = dayBreaks.find(db => db.date === selectedDate);
+    const dayBreakStart = matchingDayBreak?.start;
+    const dayBreakEnd = matchingDayBreak?.end;
+    return slots.filter(slot => {
+      if (isSlotInBreak(slot, breakStart, breakEnd)) return false;
+      if (isSlotInBreak(slot, dayBreakStart, dayBreakEnd)) return false;
+      return true;
+    });
   };
 
   const availableSlots = getSlots();

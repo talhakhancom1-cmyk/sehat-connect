@@ -174,7 +174,7 @@ export default function ChatThread() {
   };
 
   const other = otherParty(conversation, user?.id);
-  const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : null;
+  const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
   const handleStartCall = async () => {
     if (!conversation || !user?.id) return;

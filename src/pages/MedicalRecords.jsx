@@ -156,10 +156,10 @@ export default function MedicalRecords() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <HealthMetricCard icon={Heart} label="Blood Pressure" value="120/80" unit="mmHg" color="bg-green-50 text-green-600" index={0} />
-                <HealthMetricCard icon={Activity} label="Heart Rate" value="72" unit="bpm" color="bg-rose-50 text-rose-600" index={1} />
-                <HealthMetricCard icon={Scale} label="BMI" value="22.4" unit="Normal" color="bg-blue-50 text-blue-600" index={2} />
-                <HealthMetricCard icon={Droplets} label="Blood Sugar" value="95" unit="mg/dL" color="bg-amber-50 text-amber-600" index={3} />
+                <HealthMetricCard icon={Heart} label="Blood Pressure" value="—" unit="mmHg" color="bg-green-50 text-green-600" index={0} />
+                <HealthMetricCard icon={Activity} label="Heart Rate" value="—" unit="bpm" color="bg-rose-50 text-rose-600" index={1} />
+                <HealthMetricCard icon={Scale} label="BMI" value="—" unit="" color="bg-blue-50 text-blue-600" index={2} />
+                <HealthMetricCard icon={Droplets} label="Blood Sugar" value="—" unit="mg/dL" color="bg-amber-50 text-amber-600" index={3} />
               </div>
             </div>
 

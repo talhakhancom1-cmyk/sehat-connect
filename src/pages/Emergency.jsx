@@ -3,6 +3,7 @@ import Layout from '@/components/Layout';
 import { Siren, Heart, Ambulance, Share2, Phone, MessageSquare } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/lib/AuthContext';
 import EmergencyContacts from '@/components/emergency/EmergencyContacts';
 import NearbyHospitals from '@/components/emergency/NearbyHospitals';
 
@@ -20,6 +21,7 @@ const etaFor = (km) => {
 
 export default function Emergency() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [sosActive, setSosActive] = useState(false);
   const [countdown, setCountdown] = useState(3);
 
@@ -133,11 +135,23 @@ export default function Emergency() {
     }, 1000);
   };
 
+  // Calculate age from date_of_birth if available
+  const calculateAge = (dob) => {
+    if (!dob) return null;
+    const d = new Date(dob);
+    if (Number.isNaN(d.getTime())) return null;
+    const diff = Date.now() - d.getTime();
+    const ageDate = new Date(diff);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
+  const age = calculateAge(user?.date_of_birth);
+
   const medicalProfile = [
-    { label: 'Blood Group', value: 'A+' },
-    { label: 'Age', value: '35 years' },
-    { label: 'Allergies', value: 'Penicillin' },
-    { label: 'Chronic Diseases', value: 'Diabetes Type 2' },
+    { label: 'Blood Group', value: user?.blood_type || 'Not set' },
+    { label: 'Age', value: age != null ? `${age} years` : 'Not set' },
+    { label: 'Allergies', value: user?.allergies || 'None recorded' },
+    { label: 'Chronic Diseases', value: 'None recorded' },
   ];
 
   return (

@@ -72,7 +72,7 @@ export default function FindDoctors() {
         doctor_id: selectedDoctor.id,
         doctor_name: selectedDoctor.full_name,
         patient_id: user?.id,
-        doctor_user_id: selectedDoctor.user_id || selectedDoctor.created_by_id,
+        doctor_user_id: selectedDoctor.user_id,
         patient_name: user?.display_name || user?.full_name || 'Patient',
         appointment_date: bookingDetails.appointment_date,
         time_slot: bookingDetails.time_slot,

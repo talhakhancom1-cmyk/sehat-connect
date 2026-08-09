@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateForAppointment } from '@/lib/conversations';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import StatusBadge from '@/components/StatusBadge';
-import { cn } from '@/lib/utils';
+import { cn, formatAppointmentDate } from '@/lib/utils';
 
 const typeConfig = {
   video: { icon: Video, label: 'Video' },
@@ -70,7 +70,7 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
           <p className="text-xs text-muted-foreground mt-0.5 capitalize">{subtitle}</p>
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
             <Calendar className="w-3.5 h-3.5" />
-            <span>{appointment.appointment_date}</span>
+            <span>{formatAppointmentDate(appointment.appointment_date)}</span>
             <span className="mx-0.5">·</span>
             <Clock className="w-3.5 h-3.5" />
             <span>{appointment.time_slot}</span>

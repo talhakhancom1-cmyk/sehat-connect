@@ -3,7 +3,17 @@ import { base44 } from '@/api/base44Client';
 export async function getOrCreateForAppointment(appointment, user) {
   if (!appointment?.id || !user?.id) return null;
   const patientId = appointment.patient_id;
-  const doctorUserId = appointment.doctor_user_id;
+  let doctorUserId = appointment.doctor_user_id;
+
+  // Backfill doctor_user_id if missing — look up the Doctor record by its PK
+  // (appointment.doctor_id is the Doctor table ID, not the User ID).
+  if (!doctorUserId && appointment.doctor_id) {
+    try {
+      const doctor = await base44.entities.Doctor.findById(appointment.doctor_id);
+      if (doctor && doctor.user_id) doctorUserId = doctor.user_id;
+    } catch {}
+  }
+
   const memberIds = [patientId, doctorUserId].filter(Boolean);
 
   try {

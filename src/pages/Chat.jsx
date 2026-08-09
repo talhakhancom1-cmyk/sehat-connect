@@ -61,7 +61,7 @@ export default function Chat() {
       const last = msgs[msgs.length - 1];
       const unread = msgs.filter(m => m.receiver_id === user?.id && !m.read).length;
       const other = otherParty(c, user?.id);
-      return { id: c.id, name: other.name, imageUrl: other.role === 'doctor' ? c.doctor_image : null, lastMessage: last, unread, sortAt: c.last_message_at || (last?.created_date) };
+      return { id: c.id, name: other.name, imageUrl: other.role === 'doctor' ? c.doctor_image : c.patient_image, lastMessage: last, unread, sortAt: c.last_message_at || (last?.created_date) };
     }).sort((a, b) => new Date(b.sortAt || 0) - new Date(a.sortAt || 0));
   }, [conversations, messages, user?.id]);
 

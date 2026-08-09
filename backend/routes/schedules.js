@@ -44,6 +44,7 @@ router.post('/', authenticate, async (req, res) => {
       break_start: body.break_start || '01:00 PM',
       break_end: body.break_end || '02:00 PM',
       days: body.days || [],
+      day_breaks: body.day_breaks || [],
       status: 'active'
     });
     res.status(201).json(schedule);

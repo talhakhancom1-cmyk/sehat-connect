@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
-import { Save, Loader2, RotateCcw } from 'lucide-react';
+import { Save, Loader2, RotateCcw, Plus, Trash2, CalendarClock } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import Skeleton from '@/components/Skeleton';
 
@@ -38,6 +38,7 @@ export default function DoctorSchedule() {
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [maxPatients, setMaxPatients] = useState(20);
   const [breakTime, setBreakTime] = useState({ start: '01:00 PM', end: '02:00 PM' });
+  const [dayBreaks, setDayBreaks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scheduleId, setScheduleId] = useState(null);
@@ -69,6 +70,7 @@ export default function DoctorSchedule() {
         setScheduleId(s.id);
         setMaxPatients(s.max_patients_per_day || 20);
         setBreakTime({ start: s.break_start || '01:00 PM', end: s.break_end || '02:00 PM' });
+        setDayBreaks(Array.isArray(s.day_breaks) ? s.day_breaks : []);
         if (s.days && Array.isArray(s.days)) {
           const newSchedule = { ...defaultSchedule };
           s.days.forEach(d => {
@@ -100,6 +102,7 @@ export default function DoctorSchedule() {
         break_start: breakTime.start,
         break_end: breakTime.end,
         days: daysArray,
+        day_breaks: dayBreaks,
       };
       if (scheduleId) {
         await base44.entities.Schedule.update(scheduleId, data);
@@ -119,6 +122,7 @@ export default function DoctorSchedule() {
     setSchedule(defaultSchedule);
     setMaxPatients(20);
     setBreakTime({ start: '01:00 PM', end: '02:00 PM' });
+    setDayBreaks([]);
   };
 
   const toggleDay = (day) => {
@@ -131,6 +135,22 @@ export default function DoctorSchedule() {
       ? daySlots.filter(s => s !== slot)
       : [...daySlots, slot].sort();
     setSchedule({ ...schedule, [day]: { ...schedule[day], slots: newSlots } });
+  };
+
+  const addDayBreak = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    setDayBreaks([...dayBreaks, { date: `${y}-${m}-${d}`, start: '01:00 PM', end: '02:00 PM', reason: '' }]);
+  };
+
+  const updateDayBreak = (i, field, value) => {
+    setDayBreaks(breaks => breaks.map((b, idx) => idx === i ? { ...b, [field]: value } : b));
+  };
+
+  const removeDayBreak = (i) => {
+    setDayBreaks(breaks => breaks.filter((_, idx) => idx !== i));
   };
 
   if (loading) {
@@ -177,6 +197,53 @@ export default function DoctorSchedule() {
               {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* Per-Day Breaks */}
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-primary" />
+              <p className="text-sm font-semibold">Day-Specific Breaks</p>
+            </div>
+            <button onClick={addDayBreak} className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+              <Plus className="w-3 h-3" /> Add Break
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-3">Mark yourself "on break" for a specific date — those slots won't be bookable by patients.</p>
+          {dayBreaks.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No day-specific breaks set.</p>
+          ) : (
+            <div className="space-y-2">
+              {dayBreaks.map((b, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg border border-border p-2">
+                  <input
+                    type="date"
+                    value={b.date}
+                    onChange={e => updateDayBreak(i, 'date', e.target.value)}
+                    className="px-2 py-1 rounded border border-input bg-card text-xs font-mono"
+                  />
+                  <select value={b.start} onChange={e => updateDayBreak(i, 'start', e.target.value)} className="px-2 py-1 rounded border border-input bg-card text-xs font-mono">
+                    {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <select value={b.end} onChange={e => updateDayBreak(i, 'end', e.target.value)} className="px-2 py-1 rounded border border-input bg-card text-xs font-mono">
+                    {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    value={b.reason || ''}
+                    onChange={e => updateDayBreak(i, 'reason', e.target.value)}
+                    placeholder="Reason (optional)"
+                    className="flex-1 px-2 py-1 rounded border border-input bg-card text-xs"
+                  />
+                  <button onClick={() => removeDayBreak(i)} className="p-1 text-muted-foreground hover:text-red-500">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Weekly Schedule */}

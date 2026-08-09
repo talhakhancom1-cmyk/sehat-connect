@@ -7,6 +7,7 @@ import DoctorAvatar from '@/components/DoctorAvatar';
 import StatusBadge from '@/components/StatusBadge';
 import { Stethoscope, Users, Calendar, DollarSign, ShieldCheck, Ban } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
+import { formatAppointmentDate } from '@/lib/utils';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -162,7 +163,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{appt.patient_name} → {appt.doctor_name}</p>
-                    <p className="text-xs text-muted-foreground">{appt.appointment_date} · {appt.time_slot} · Rs {Number(appt.consultation_fee || 0).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">{formatAppointmentDate(appt.appointment_date)} · {appt.time_slot} · Rs {Number(appt.consultation_fee || 0).toLocaleString()}</p>
                   </div>
                   <StatusBadge status={appt.status} />
                 </div>

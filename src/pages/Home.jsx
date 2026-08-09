@@ -8,7 +8,7 @@ import VideoCall from '@/components/VideoCall';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, Eye, Star, Video, BadgeCheck, FileText, Pill, QrCode } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatAppointmentDate } from '@/lib/utils';
 import { getOrCreateForAppointment } from '@/lib/conversations';
 
 const specialties = [
@@ -75,7 +75,7 @@ export default function Home() {
                 <p className="text-xs text-muted-foreground">Doctor</p>
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>{nextAppt.appointment_date}</span>
+                  <span>{formatAppointmentDate(nextAppt.appointment_date)}</span>
                   <span className="mx-0.5">·</span>
                   <Clock className="w-3.5 h-3.5" />
                   <span>{nextAppt.time_slot}</span>

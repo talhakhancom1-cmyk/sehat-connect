@@ -16,7 +16,7 @@ export default function Prescriptions() {
 
   const load = async () => {
     try {
-      const data = await base44.entities.Prescription.filter({ patient_name: user?.full_name }, '-date', 50);
+      const data = await base44.entities.Prescription.filter({ patient_id: user?.id }, '-date', 50);
       setPrescriptions(data);
     } catch { setPrescriptions([]); }
     finally { setLoading(false); }

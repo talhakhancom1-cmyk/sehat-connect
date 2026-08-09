@@ -78,7 +78,7 @@ export default function DoctorProfile() {
         doctor_id: doctor.id,
         doctor_name: doctor.full_name,
         patient_id: user?.id,
-        doctor_user_id: doctor.user_id || doctor.created_by_id,
+        doctor_user_id: doctor.user_id,
         patient_name: user?.display_name || user?.full_name || 'Patient',
         appointment_date: bookingDetails.appointment_date,
         time_slot: bookingDetails.time_slot,

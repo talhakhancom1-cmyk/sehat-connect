@@ -8,6 +8,7 @@ const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
+const { sendNotification } = require('../lib/notificationDispatcher');
 
 // Fields that can be set on an Appointment
 const APPOINTMENT_WRITABLE_FIELDS = [
@@ -19,6 +20,15 @@ const APPOINTMENT_WRITABLE_FIELDS = [
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
+}
+
+// Normalize appointment_date to "YYYY-MM-DD" so the frontend always gets a
+// clean calendar date regardless of how PostgreSQL returns the timestamp.
+// The actual time of the appointment lives in the `time_slot` field.
+function normalizeDate(value) {
+  if (!value) return value;
+  const str = String(value);
+  return str.split('T')[0];
 }
 
 // Returns true if the user is the patient or the doctor on this appointment (or an admin).
@@ -78,6 +88,7 @@ router.get('/', authenticate, async (req, res) => {
     for (const d of doctors) doctorImageById[d.id] = d.profile_pic_url || null;
     const result = rows.map(a => ({
       ...a.toJSON(),
+      appointment_date: normalizeDate(a.appointment_date),
       doctor_image: doctorImageById[a.doctor_id] || null,
       created_date: a.created_at
     }));
@@ -98,7 +109,7 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const doctor = appointment.doctor_id ? await Doctor.findByPk(appointment.doctor_id).catch(() => null) : null;
-    res.json({ ...appointment.toJSON(), doctor_image: doctor?.profile_pic_url || null });
+    res.json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date), doctor_image: doctor?.profile_pic_url || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -110,9 +121,42 @@ router.post('/', authenticate, async (req, res) => {
     const body = pickFields(req.body, APPOINTMENT_WRITABLE_FIELDS);
     if (!isAdmin(req.user)) {
       body.patient_id = req.user.id;
+      body.patient_name = req.user.display_name || req.user.full_name || req.user.email || 'Patient';
+    }
+    // Safeguard: auto-populate doctor_user_id from the Doctor table if the
+    // frontend didn't send it (e.g. legacy booking flow or missing user_id).
+    // Without this, conversations can't route messages to the doctor.
+    if (body.doctor_id && !body.doctor_user_id) {
+      const doctor = await Doctor.findByPk(body.doctor_id).catch(() => null);
+      if (doctor && doctor.user_id) {
+        body.doctor_user_id = doctor.user_id;
+      }
     }
     const appointment = await Appointment.create(body);
-    res.status(201).json(appointment);
+
+    // Notify the doctor that a new appointment was booked.
+    // Include the patient's name and appointment details for context.
+    if (body.doctor_user_id) {
+      const io = req.app.get('io');
+      sendNotification({
+        user_id: body.doctor_user_id,
+        type: 'appointment_update',
+        title: 'New Appointment Booked',
+        body: `${body.patient_name || 'A patient'} booked a ${body.type || 'video'} appointment on ${normalizeDate(appointment.appointment_date)} at ${body.time_slot || '—'}.`,
+        data: {
+          appointment_id: appointment.id,
+          doctor_id: body.doctor_id,
+          patient_id: body.patient_id,
+          patient_name: body.patient_name,
+          appointment_date: normalizeDate(appointment.appointment_date),
+          time_slot: body.time_slot,
+          type: body.type,
+        },
+        priority: 'high',
+      }, io).catch(() => {});
+    }
+
+    res.status(201).json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date) });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -139,8 +183,45 @@ router.put('/:id', authenticate, async (req, res) => {
       : isPatientOwner
         ? ['status', 'notes', 'reason', 'symptoms', 'payment_status', 'payment_method']
         : ['status', 'notes', 'reason', 'symptoms'];
+    const newStatus = req.body.status;
     await appointment.update(pickFields(req.body, allowedFields));
-    res.json(appointment);
+
+    // If the status changed, notify the other party with context.
+    if (newStatus && newStatus !== appointment._previousDataValues.status) {
+      const io = req.app.get('io');
+      const isDoctorUpdating = !isPatientOwner && !isAdmin(req.user);
+      const recipientId = isDoctorUpdating ? appointment.patient_id : appointment.doctor_user_id;
+      const actorName = isDoctorUpdating
+        ? `Dr. ${appointment.doctor_name}`
+        : (appointment.patient_name || 'The patient');
+      const statusMessages = {
+        confirmed: 'confirmed your appointment',
+        cancelled: 'cancelled the appointment',
+        rejected: 'rejected the appointment',
+        completed: 'marked the appointment as completed',
+        in_progress: 'started the consultation',
+      };
+      const action = statusMessages[newStatus] || `updated the appointment to ${newStatus}`;
+      if (recipientId) {
+        sendNotification({
+          user_id: recipientId,
+          type: 'appointment_update',
+          title: `Appointment ${newStatus}`,
+          body: `${actorName} ${action} on ${normalizeDate(appointment.appointment_date)} at ${appointment.time_slot || '—'}.`,
+          data: {
+            appointment_id: appointment.id,
+            doctor_name: appointment.doctor_name,
+            patient_name: appointment.patient_name,
+            appointment_date: normalizeDate(appointment.appointment_date),
+            time_slot: appointment.time_slot,
+            status: newStatus,
+          },
+          priority: newStatus === 'cancelled' || newStatus === 'rejected' ? 'high' : 'normal',
+        }, io).catch(() => {});
+      }
+    }
+
+    res.json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date) });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

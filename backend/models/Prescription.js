@@ -20,6 +20,23 @@ const Prescription = sequelize.define('Prescription', {
   doctor_name: {
     type: DataTypes.STRING
   },
+  doctor_specialty: {
+    type: DataTypes.STRING
+  },
+  diagnosis: {
+    type: DataTypes.TEXT
+  },
+  follow_up: {
+    type: DataTypes.STRING
+  },
+  is_signed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  signed_at: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   appointment_id: {
     type: DataTypes.STRING
   },

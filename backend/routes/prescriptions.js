@@ -12,6 +12,18 @@ function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
 }
 
+// Map a PrescriptionItem row to the frontend-expected medication shape
+function itemToMedication(item) {
+  return {
+    name: item.medication_name,
+    dosage: item.dosage,
+    frequency: item.frequency,
+    duration: item.duration,
+    route: item.route,
+    instructions: item.instructions,
+  };
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const where = {};
@@ -36,7 +48,23 @@ router.get('/', authenticate, async (req, res) => {
       offset,
       limit
     });
-    const result = rows.map(p => ({ ...p.toJSON(), created_date: p.created_at, date: p.issued_at }));
+    // Fetch items for all prescriptions in one query (avoids N+1)
+    const prescriptionIds = rows.map(p => p.id);
+    const allItems = prescriptionIds.length ? await PrescriptionItem.findAll({
+      where: { prescription_id: prescriptionIds },
+      order: [['display_order', 'ASC']]
+    }) : [];
+    const itemsByPresc = {};
+    for (const item of allItems) {
+      if (!itemsByPresc[item.prescription_id]) itemsByPresc[item.prescription_id] = [];
+      itemsByPresc[item.prescription_id].push(itemToMedication(item));
+    }
+    const result = rows.map(p => ({
+      ...p.toJSON(),
+      medications: itemsByPresc[p.id] || [],
+      created_date: p.created_at,
+      date: p.issued_at
+    }));
     res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -49,8 +77,10 @@ router.post('/', authenticate, async (req, res) => {
     if (!body.patient_id) {
       return res.status(400).json({ error: 'patient_id is required' });
     }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return res.status(400).json({ error: 'items array is required' });
+    // Accept both `items` (canonical) and `medications` (frontend field name)
+    const meds = Array.isArray(body.items) ? body.items : (Array.isArray(body.medications) ? body.medications : []);
+    if (meds.length === 0) {
+      return res.status(400).json({ error: 'items/medications array is required' });
     }
 
     const prescription = await Prescription.create({
@@ -58,18 +88,22 @@ router.post('/', authenticate, async (req, res) => {
       patient_name: body.patient_name,
       doctor_id: body.doctor_id || req.user.id,
       doctor_name: body.doctor_name,
+      doctor_specialty: body.doctor_specialty,
+      diagnosis: body.diagnosis,
+      follow_up: body.follow_up,
       appointment_id: body.appointment_id,
       encounter_id: body.encounter_id,
       status: 'active',
       notes: body.notes,
-      issued_at: body.issued_at || new Date(),
+      issued_at: body.issued_at || body.date || new Date(),
+      is_signed: false,
       signed_by_user_id: req.user.id
     });
 
     const items = await PrescriptionItem.bulkCreate(
-      body.items.map((item, index) => ({
+      meds.map((item, index) => ({
         prescription_id: prescription.id,
-        medication_name: item.medication_name,
+        medication_name: item.medication_name || item.name,
         dosage: item.dosage,
         frequency: item.frequency,
         duration: item.duration,
@@ -79,7 +113,7 @@ router.post('/', authenticate, async (req, res) => {
       }))
     );
 
-    res.status(201).json({ ...prescription.toJSON(), items });
+    res.status(201).json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -95,7 +129,7 @@ router.get('/:id', authenticate, async (req, res) => {
       where: { prescription_id: prescription.id },
       order: [['display_order', 'ASC']]
     });
-    res.json({ ...prescription.toJSON(), items });
+    res.json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

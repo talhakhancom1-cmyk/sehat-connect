@@ -30,6 +30,12 @@ const Schedule = sequelize.define('Schedule', {
     type: DataTypes.JSONB,
     defaultValue: []
   },
+  // Per-day breaks: array of { date: "YYYY-MM-DD", start: "01:00 PM", end: "02:00 PM", reason: "Lunch" }
+  // These block specific time slots on specific days without affecting the recurring weekly schedule.
+  day_breaks: {
+    type: DataTypes.JSONB,
+    defaultValue: []
+  },
   status: {
     type: DataTypes.ENUM('active', 'inactive'),
     defaultValue: 'active'

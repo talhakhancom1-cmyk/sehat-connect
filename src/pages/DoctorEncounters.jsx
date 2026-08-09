@@ -5,6 +5,7 @@ import EmptyState from '@/components/EmptyState';
 import EncounterForm from '@/components/EncounterForm';
 import { useDoctorProfile } from '@/lib/useRole';
 import { Stethoscope, ClipboardList, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { formatAppointmentDate } from '@/lib/utils';
 
 export default function DoctorEncounters() {
   const { doctor, isVerified } = useDoctorProfile();
@@ -124,7 +125,7 @@ function Row({ appt, actionLabel, onAction }) {
     <div className="rounded-xl border border-border bg-card p-3 flex items-center justify-between">
       <div>
         <p className="text-sm font-semibold">{appt.patient_name}</p>
-        <p className="text-[11px] text-muted-foreground font-mono">{appt.appointment_date} · {appt.time_slot} · {appt.type}</p>
+        <p className="text-[11px] text-muted-foreground font-mono">{formatAppointmentDate(appt.appointment_date)} · {appt.time_slot} · {appt.type}</p>
       </div>
       <button onClick={onAction} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all">{actionLabel}</button>
     </div>
