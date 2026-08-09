@@ -7,7 +7,7 @@ import EmptyState from '@/components/EmptyState';
 import FamilyShareModal from '@/components/FamilyShareModal';
 import FamilyAuthorizations from '@/components/FamilyAuthorizations';
 import SharedRecordsList from '@/components/SharedRecordsList';
-import { Heart, Activity, Droplets, Plus, ChevronRight, FileText, Search, FileImage, Scale, UploadCloud, CalendarClock, Share2 } from 'lucide-react';
+import { Heart, Activity, Droplets, Plus, ChevronRight, FileText, Search, FileImage, Scale, UploadCloud, CalendarClock, Share2, X, Loader2 } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
@@ -39,6 +39,9 @@ export default function MedicalRecords() {
   const [tab, setTab] = useState('mine');
   const [showShare, setShowShare] = useState(false);
   const [authKey, setAuthKey] = useState(0);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [pickCategory, setPickCategory] = useState(categories[1]);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => { if (user?.id) load(); }, [user?.id]);
@@ -51,25 +54,41 @@ export default function MedicalRecords() {
     finally { setLoading(false); }
   };
 
-  const handleUpload = async (e) => {
+  // Selecting a file just opens the category picker — it does NOT upload
+  // immediately. Uploading before the category is chosen was the cause of
+  // every quick-add record being saved as "Blood Report" regardless of what
+  // was actually uploaded (e.g. an X-ray).
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
+    setPickCategory(categories[1]);
+    setPendingFile(file);
+  };
+
+  const confirmUpload = async () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    setUploading(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.entities.MedicalRecord.create({
-        patient_name: user?.full_name || 'Patient',
+        patient_name: user?.full_name || user?.display_name || 'Patient',
         title: file.name.replace(/\.[^/.]+$/, ''),
-        category: 'Blood Report',
+        category: pickCategory,
         date: new Date().toISOString().split('T')[0],
         file_url,
         file_type: file.type,
         notes: 'Uploaded by patient',
       });
-      toast({ title: 'Record uploaded', description: `${file.name} has been added to your records.` });
+      toast({ title: 'Record uploaded', description: `${file.name} has been added as ${pickCategory}.` });
+      setPendingFile(null);
       load();
     } catch (err) {
       toast({ title: 'Upload failed', description: 'Could not upload the file. Please try again.', variant: 'destructive' });
       console.error(err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -198,7 +217,7 @@ export default function MedicalRecords() {
                   <Share2 className="w-4 h-4" /> Share with family
                 </button>
               </div>
-              <input ref={fileRef} type="file" onChange={handleUpload} className="hidden" />
+              <input ref={fileRef} type="file" onChange={handleFileSelect} className="hidden" />
 
               {/* Search */}
               <div className="flex items-center gap-2 mb-3">
@@ -291,6 +310,50 @@ export default function MedicalRecords() {
           onClose={() => setShowShare(false)}
           onGranted={() => { setShowShare(false); setAuthKey((k) => k + 1); }}
         />
+      )}
+
+      {pendingFile && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !uploading && setPendingFile(null)}>
+          <div className="bg-card rounded-2xl w-full max-w-sm animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 flex items-center justify-between border-b border-border">
+              <h3 className="font-bold text-base">Choose a category</h3>
+              <button onClick={() => !uploading && setPendingFile(null)} className="p-2 rounded-full hover:bg-secondary active:scale-95 transition-all">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-secondary/50">
+                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                <p className="text-sm truncate">{pendingFile.name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.filter((c) => c !== 'All').map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setPickCategory(cat)}
+                    className={cn(
+                      'px-3 py-2 rounded-xl text-xs font-medium border transition-all text-left',
+                      pickCategory === cat
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-secondary'
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={confirmUpload}
+                disabled={uploading}
+                className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-60"
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                {uploading ? 'Uploading…' : `Upload as ${pickCategory}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

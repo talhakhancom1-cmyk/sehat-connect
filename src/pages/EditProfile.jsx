@@ -7,12 +7,14 @@ import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Camera, Loader2, User as UserIcon } from 'lucide-react';
+import { Camera, Loader2, User as UserIcon, KeyRound, ShieldAlert } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
+const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export default function EditProfile() {
   const { user, checkUserAuth } = useAuth();
@@ -20,18 +22,40 @@ export default function EditProfile() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Profile fields
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
   const [profilePicUrl, setProfilePicUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [doctor, setDoctor] = useState(null);
 
+  // Patient medical / emergency fields
+  const [bloodType, setBloodType] = useState('');
+  const [allergies, setAllergies] = useState('');
+  const [emergencyContactName, setEmergencyContactName] = useState('');
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
+  const [savingMedical, setSavingMedical] = useState(false);
+
+  // Password change fields
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     setDisplayName(user.display_name || user.full_name || '');
     setPhone(user.phone || '');
+    setAddress(user.address || '');
+    setCity(user.city || '');
     setProfilePicUrl(user.profile_pic_url || '');
+    setBloodType(user.blood_type || '');
+    setAllergies(user.allergies || '');
+    setEmergencyContactName(user.emergency_contact_name || '');
+    setEmergencyContactPhone(user.emergency_contact_phone || '');
   }, [user]);
 
   useEffect(() => {
@@ -88,6 +112,8 @@ export default function EditProfile() {
       await base44.auth.updateMe({
         display_name: displayName,
         phone,
+        address,
+        city,
         profile_pic_url: profilePicUrl,
       });
       // Doctors have a separate Doctor row with its own profile_pic_url — keep it in sync.
@@ -95,6 +121,8 @@ export default function EditProfile() {
         await base44.entities.Doctor.update(doctor.id, {
           full_name: displayName,
           phone,
+          address,
+          city,
           profile_pic_url: profilePicUrl,
           image_url: profilePicUrl,
         });
@@ -108,11 +136,58 @@ export default function EditProfile() {
     }
   };
 
+  const handleSaveMedical = async (e) => {
+    e.preventDefault();
+    setSavingMedical(true);
+    try {
+      await base44.auth.updateMe({
+        blood_type: bloodType || null,
+        allergies,
+        emergency_contact_name: emergencyContactName,
+        emergency_contact_phone: emergencyContactPhone,
+      });
+      await checkUserAuth();
+      toast({ title: 'Medical info updated' });
+    } catch (err) {
+      toast({ title: 'Update failed', description: err.message || 'Please try again', variant: 'destructive' });
+    } finally {
+      setSavingMedical(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      toast({ title: 'Missing fields', description: 'Enter your current and new password.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({ title: 'Password too short', description: 'New password must be at least 8 characters.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Passwords do not match', variant: 'destructive' });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await base44.auth.changePassword({ currentPassword, newPassword });
+      toast({ title: 'Password changed' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast({ title: 'Password change failed', description: err.message || 'Please try again', variant: 'destructive' });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   return (
     <Layout role={role} title="My Profile">
-      <div className="max-w-lg mx-auto animate-fade-in">
+      <div className="max-w-lg mx-auto animate-fade-in space-y-5">
+        {/* Profile info */}
         <form onSubmit={handleSave} className="bg-card rounded-2xl p-6 shadow-card space-y-5">
-          {/* Profile picture */}
           <div className="flex flex-col items-center gap-3">
             <div className="relative">
               <div className="w-24 h-24 rounded-full bg-muted border-2 border-border overflow-hidden flex items-center justify-center">
@@ -151,6 +226,17 @@ export default function EditProfile() {
             <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11" placeholder="+92 300 1234567" />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} className="h-11" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="h-11" />
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1 h-11" onClick={() => navigate(-1)}>
               Cancel
@@ -159,6 +245,75 @@ export default function EditProfile() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save changes'}
             </Button>
           </div>
+        </form>
+
+        {/* Medical / emergency info — relevant for patients */}
+        {role !== 'admin' && (
+          <form onSubmit={handleSaveMedical} className="bg-card rounded-2xl p-6 shadow-card space-y-5">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-primary" />
+              <h3 className="font-bold text-sm">Emergency & medical info</h3>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="blood-type">Blood type</Label>
+              <Select value={bloodType || undefined} onValueChange={setBloodType}>
+                <SelectTrigger id="blood-type" className="h-11">
+                  <SelectValue placeholder="Select blood type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bloodTypes.map((bt) => <SelectItem key={bt} value={bt}>{bt}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="allergies">Allergies</Label>
+              <Input id="allergies" value={allergies} onChange={(e) => setAllergies(e.target.value)} className="h-11" placeholder="e.g. Penicillin, Peanuts" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="ec-name">Emergency contact name</Label>
+                <Input id="ec-name" value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)} className="h-11" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ec-phone">Emergency contact phone</Label>
+                <Input id="ec-phone" value={emergencyContactPhone} onChange={(e) => setEmergencyContactPhone(e.target.value)} className="h-11" />
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full h-11" disabled={savingMedical}>
+              {savingMedical ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save medical info'}
+            </Button>
+          </form>
+        )}
+
+        {/* Change password */}
+        <form onSubmit={handleChangePassword} className="bg-card rounded-2xl p-6 shadow-card space-y-5">
+          <div className="flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-primary" />
+            <h3 className="font-bold text-sm">Change password</h3>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Current password</Label>
+            <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-11" autoComplete="current-password" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New password</Label>
+            <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-11" autoComplete="new-password" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm new password</Label>
+            <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-11" autoComplete="new-password" />
+          </div>
+
+          <Button type="submit" className="w-full h-11" disabled={changingPassword}>
+            {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update password'}
+          </Button>
         </form>
       </div>
     </Layout>
