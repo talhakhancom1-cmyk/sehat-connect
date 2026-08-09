@@ -57,11 +57,31 @@ function routeFor(entityName) {
   return entityName.charAt(0).toLowerCase() + entityName.slice(1) + 's';
 }
 
+/**
+ * Normalise the API response into a plain array.
+ *
+ * Before pagination was added, list endpoints returned a bare array `[...]`.
+ * After pagination, they return `{ data: [...], total_count, page, ... }`.
+ * This helper accepts both shapes and always returns an array, so frontend
+ * code can keep calling `.filter()`, `.map()`, etc. without breaking.
+ */
+function toArray(resp) {
+  if (Array.isArray(resp)) return resp;
+  if (resp && Array.isArray(resp.data)) return resp.data;
+  return [];
+}
+
 function makeEntityClient(entityName) {
   const base = `/${routeFor(entityName)}`;
   return {
-    list: () => request(base),
-    filter: (filterObj, sort, limit) => {
+    list: async (sort, limit) => {
+      const params = new URLSearchParams();
+      if (sort) params.append('_sort', sort);
+      if (limit) params.append('_limit', String(limit));
+      const qs = params.toString();
+      return toArray(await request(qs ? `${base}?${qs}` : base));
+    },
+    filter: async (filterObj, sort, limit) => {
       const params = new URLSearchParams();
       if (filterObj && typeof filterObj === 'object') {
         for (const [key, value] of Object.entries(filterObj)) {
@@ -73,7 +93,8 @@ function makeEntityClient(entityName) {
       if (sort) params.append('_sort', sort);
       if (limit) params.append('_limit', String(limit));
       const qs = params.toString();
-      return request(qs ? `${base}?${qs}` : base);
+      const resp = await request(qs ? `${base}?${qs}` : base);
+      return toArray(resp);
     },
     get: (id) => request(`${base}/${id}`),
     create: (data) => request(base, { method: 'POST', body: data }),

@@ -69,7 +69,8 @@ export default function AdminApiKeys() {
     setLoading(true);
     try {
       const data = await apiRequest('/api-keys');
-      setKeys(data.data || data || []);
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+      setKeys(list);
     } catch (e) {
       toast({ title: 'Failed to load API keys', description: String(e?.message || e), variant: 'destructive' });
     } finally {
