@@ -116,10 +116,17 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!(await canAccessAppointment(appointment, req.user))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    // Non-admins can only update status and notes, not payment fields
+    // Non-admins: the doctor can only update status/notes, never payment fields
+    // (that would let a doctor fake-approve an unpaid appointment). The patient,
+    // however, must be able to set payment_status/payment_method on their OWN
+    // appointment — that's how PaymentDialog.jsx unblocks the doctor's confirm
+    // gate after a (dummy) payment completes.
+    const isPatientOwner = appointment.patient_id === req.user.id;
     const allowedFields = isAdmin(req.user)
       ? APPOINTMENT_WRITABLE_FIELDS
-      : ['status', 'notes', 'reason', 'symptoms'];
+      : isPatientOwner
+        ? ['status', 'notes', 'reason', 'symptoms', 'payment_status', 'payment_method']
+        : ['status', 'notes', 'reason', 'symptoms'];
     await appointment.update(pickFields(req.body, allowedFields));
     res.json(appointment);
   } catch (error) {
