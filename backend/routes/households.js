@@ -12,10 +12,14 @@ const {
 const { DELEGATION_SCOPES } = require('../models/HouseholdInvitation');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { pickFields } = require('../lib/pickFields');
 
 const router = express.Router();
 
 const INVITATION_TTL_DAYS = 7;
+
+// Whitelist for household updates (prevents overwriting head_user_ids, created_by_user_id, etc.)
+const HOUSEHOLD_WRITABLE = ['name', 'country', 'status'];
 
 async function assertHead(householdId, userId) {
   const household = await Household.findByPk(householdId);
@@ -138,8 +142,7 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const household = await Household.findByPk(req.params.id);
     if (!household) return res.status(404).json({ error: 'Household not found' });
-    const updates = { ...req.body };
-    delete updates.id;
+    const updates = pickFields(req.body, HOUSEHOLD_WRITABLE);
     await household.update(updates);
     res.json({
       ...household.toJSON(),

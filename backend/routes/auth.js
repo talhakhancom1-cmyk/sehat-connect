@@ -94,7 +94,20 @@ router.put('/me', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
-    await user.update(req.body);
+    // Whitelist fields to prevent mass-assignment (e.g. role escalation)
+    const allowedFields = [
+      'display_name', 'phone', 'address', 'city', 'country',
+      'profile_pic_url', 'date_of_birth', 'age', 'gender',
+      'blood_type', 'allergies', 'emergency_contact_name', 'emergency_contact_phone',
+      'specialty', 'pmdc_number', 'consultation_fee', 'experience_years', 'bio'
+    ];
+    const updates = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+    await user.update(updates);
     res.json(user);
   } catch (error) {
     console.error('Update me error:', error);

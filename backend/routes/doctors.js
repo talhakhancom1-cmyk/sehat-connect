@@ -7,6 +7,15 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
+const { pickFields } = require('../lib/pickFields');
+
+// Fields that can be set on a Doctor profile
+const DOCTOR_WRITABLE_FIELDS = [
+  'user_id', 'full_name', 'email', 'phone', 'specialty', 'city', 'country',
+  'bio', 'consultation_fee', 'experience_years', 'rating', 'review_count',
+  'verification_status', 'profile_pic_url', 'languages', 'education',
+  'certifications', 'availability', 'pmdc_number'
+];
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -109,7 +118,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create new doctor (admin only — onboarding creates Doctor rows via the model directly)
 router.post('/', authenticate, requireAdmin(), async (req, res) => {
   try {
-    const doctor = await Doctor.create(req.body);
+    const doctor = await Doctor.create(pickFields(req.body, DOCTOR_WRITABLE_FIELDS));
     res.status(201).json(doctor);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -126,7 +135,13 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!isAdmin(req.user) && !isDoctorSelf(doctor, req.user)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await doctor.update(req.body);
+    // Non-admins can only update a subset of their own profile fields
+    const allowedFields = isAdmin(req.user)
+      ? DOCTOR_WRITABLE_FIELDS
+      : ['full_name', 'phone', 'city', 'country', 'bio', 'profile_pic_url',
+         'consultation_fee', 'experience_years', 'languages', 'education',
+         'certifications', 'availability', 'pmdc_number'];
+    await doctor.update(pickFields(req.body, allowedFields));
     res.json(doctor);
   } catch (error) {
     res.status(400).json({ error: error.message });

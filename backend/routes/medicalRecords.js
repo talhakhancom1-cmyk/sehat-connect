@@ -5,6 +5,14 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
+const { pickFields } = require('../lib/pickFields');
+
+// Fields that can be set on a MedicalRecord
+const RECORD_WRITABLE_FIELDS = [
+  'patient_id', 'title', 'category', 'type', 'date', 'doctor_name',
+  'facility', 'description', 'file_url', 'file_type', 'file_size',
+  'tags', 'provenance', 'source', 'is_shared', 'status'
+];
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -52,7 +60,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create new medical record — patient_id is always forced to the caller unless admin
 router.post('/', authenticate, async (req, res) => {
   try {
-    const body = { ...req.body };
+    const body = pickFields(req.body, RECORD_WRITABLE_FIELDS);
     if (!isAdmin(req.user)) {
       body.patient_id = req.user.id;
     }
@@ -70,7 +78,7 @@ router.put('/:id', authenticate, requireAdmin(), async (req, res) => {
     if (!record) {
       return res.status(404).json({ error: 'Medical record not found' });
     }
-    await record.update(req.body);
+    await record.update(pickFields(req.body, RECORD_WRITABLE_FIELDS));
     res.json(record);
   } catch (error) {
     res.status(400).json({ error: error.message });

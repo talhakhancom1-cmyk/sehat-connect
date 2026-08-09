@@ -3,8 +3,13 @@ const { Op } = require('sequelize');
 const { Conversation, Message } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
+const { pickFields } = require('../lib/pickFields');
 
 const router = express.Router();
+
+// Whitelists for mass-assignment protection
+const CONVERSATION_WRITABLE = ['title', 'status', 'member_ids', 'last_message_at'];
+const MESSAGE_WRITABLE = ['content', 'body', 'read', 'status', 'attachment_url', 'attachment_type'];
 
 function parseMemberIds(value) {
   if (!value) return [];
@@ -120,8 +125,7 @@ router.put('/conversations/:conversationId', authenticate, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
-    const updates = { ...req.body };
-    delete updates.id;
+    const updates = pickFields(req.body, CONVERSATION_WRITABLE);
     if (Array.isArray(updates.member_ids)) {
       updates.member_ids = JSON.stringify(updates.member_ids);
     }
@@ -332,8 +336,7 @@ router.put('/messages/:id', authenticate, async (req, res) => {
     if (!message) {
       return res.status(404).json({ error: 'Message not found' });
     }
-    const updates = { ...req.body };
-    delete updates.id;
+    const updates = pickFields(req.body, MESSAGE_WRITABLE);
     if (updates.read === true) {
       updates.status = 'read';
     }

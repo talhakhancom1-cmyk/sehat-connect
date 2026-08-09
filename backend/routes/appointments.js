@@ -7,6 +7,15 @@ const { authenticate } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
+const { pickFields } = require('../lib/pickFields');
+
+// Fields that can be set on an Appointment
+const APPOINTMENT_WRITABLE_FIELDS = [
+  'patient_id', 'doctor_id', 'doctor_user_id', 'appointment_date',
+  'type', 'status', 'reason', 'notes', 'payment_status',
+  'amount', 'currency', 'payment_method', 'payment_id',
+  'consent_id', 'location', 'duration_minutes', 'follow_up_date'
+];
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -86,7 +95,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create new appointment — patient_id is always forced to the caller unless admin
 router.post('/', authenticate, async (req, res) => {
   try {
-    const body = { ...req.body };
+    const body = pickFields(req.body, APPOINTMENT_WRITABLE_FIELDS);
     if (!isAdmin(req.user)) {
       body.patient_id = req.user.id;
     }
@@ -107,7 +116,11 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!(await canAccessAppointment(appointment, req.user))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    await appointment.update(req.body);
+    // Non-admins can only update status and notes, not payment fields
+    const allowedFields = isAdmin(req.user)
+      ? APPOINTMENT_WRITABLE_FIELDS
+      : ['status', 'notes', 'reason'];
+    await appointment.update(pickFields(req.body, allowedFields));
     res.json(appointment);
   } catch (error) {
     res.status(400).json({ error: error.message });

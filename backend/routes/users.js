@@ -4,6 +4,17 @@ const User = require('../models/User');
 const { sequelize } = require('../config/database');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { pickFields } = require('../lib/pickFields');
+
+// Fields an admin can set when creating/updating a user
+const USER_WRITABLE_FIELDS = [
+  'email', 'role', 'app_role', 'onboarded',
+  'display_name', 'phone', 'address', 'city', 'country',
+  'profile_pic_url', 'date_of_birth', 'age', 'gender',
+  'blood_type', 'allergies', 'emergency_contact_name', 'emergency_contact_phone',
+  'specialty', 'pmdc_number', 'consultation_fee', 'experience_years', 'bio',
+  'verification_status'
+];
 
 // Get all users (admin only)
 router.get('/', authenticate, requireAdmin(), async (req, res) => {
@@ -38,7 +49,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create new user (admin only — regular registration goes through /api/auth/register)
 router.post('/', authenticate, requireAdmin(), async (req, res) => {
   try {
-    const user = await User.create(req.body);
+    const user = await User.create(pickFields(req.body, USER_WRITABLE_FIELDS));
     res.status(201).json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -52,7 +63,7 @@ router.put('/:id', authenticate, requireAdmin(), async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    await user.update(req.body);
+    await user.update(pickFields(req.body, USER_WRITABLE_FIELDS));
     res.json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
