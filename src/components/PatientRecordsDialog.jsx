@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { checkRecordAccess, daysUntilExpiry } from '@/lib/recordAccess';
 import { FileText, Lock, ShieldCheck, Clock, X, FileImage } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 
 const categoryColors = {
   'Blood Report': 'text-rose-600 bg-rose-100',
@@ -133,7 +133,7 @@ export default function PatientRecordsDialog({ patientName, doctorId, open, onCl
                         </div>
                         {rec.file_url && (
                           <a
-                            href={rec.file_url}
+                            href={authFileUrl(rec.file_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-primary font-medium hover:underline shrink-0"

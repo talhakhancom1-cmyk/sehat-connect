@@ -8,7 +8,7 @@ import { recordAudit } from '@/lib/audit';
 import { CalendarClock, FileText, X, ExternalLink } from 'lucide-react';
 import { formatRecordDate } from '@/lib/recordDate';
 import { categoryIcon } from '@/components/RecordTimeline';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 
 export default function RecordTimelinePage() {
   const { user } = useAuth();
@@ -83,7 +83,7 @@ export default function RecordTimelinePage() {
               {open.hospital && !open.source_hospital && <Detail label="Hospital" value={open.hospital} />}
               {open.notes && <Detail label="Notes" value={open.notes} />}
               {open.file_url && (
-                <a href={open.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
+                <a href={authFileUrl(open.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
                   <ExternalLink className="w-4 h-4" /> Open file
                 </a>
               )}

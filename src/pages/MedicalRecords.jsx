@@ -8,7 +8,7 @@ import FamilyShareModal from '@/components/FamilyShareModal';
 import FamilyAuthorizations from '@/components/FamilyAuthorizations';
 import SharedRecordsList from '@/components/SharedRecordsList';
 import { Heart, Activity, Droplets, Plus, ChevronRight, FileText, Search, FileImage, Scale, UploadCloud, CalendarClock, Share2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -257,7 +257,7 @@ export default function MedicalRecords() {
                             {rec.category}
                           </span>
                           {rec.file_url && (
-                            <a href={rec.file_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline">
+                            <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline">
                               View
                             </a>
                           )}

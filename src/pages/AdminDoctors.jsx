@@ -5,7 +5,7 @@ import DoctorAvatar from '@/components/DoctorAvatar';
 import StatusBadge from '@/components/StatusBadge';
 import { recordAudit } from '@/lib/audit';
 import { Search, ShieldCheck, Ban, RotateCcw, Stethoscope, FileText, X, ExternalLink } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 
 const tabs = ['all', 'pending', 'verified', 'suspended'];
 
@@ -192,7 +192,7 @@ function DocLink({ label, url }) {
     );
   }
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+    <a href={authFileUrl(url)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
       <FileText className="w-4 h-4" /> {label} <ExternalLink className="w-3.5 h-3.5" />
     </a>
   );

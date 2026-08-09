@@ -5,7 +5,7 @@ import {
   X, FileText, Lock, ShieldCheck, Clock, FileImage, Pill, CalendarDays,
   Stethoscope, Activity, User, ChevronRight, ClipboardList
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 
 const categoryColors = {
   'Blood Report': 'text-rose-600 bg-rose-100',
@@ -288,7 +288,7 @@ function OverviewTab({ patientName, patientAge, patientGender, records, prescrip
                     <p className="text-[11px] text-muted-foreground">{rec.category} · {rec.date}</p>
                   </div>
                   {rec.file_url && (
-                    <a href={rec.file_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline shrink-0">
+                    <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline shrink-0">
                       View
                     </a>
                   )}
@@ -332,7 +332,7 @@ function RecordsTab({ records }) {
               {rec.hospital && <p className="text-[10px] text-muted-foreground">{rec.hospital}</p>}
             </div>
             {rec.file_url && (
-              <a href={rec.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary font-medium hover:underline shrink-0">
+              <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-primary font-medium hover:underline shrink-0">
                 View
               </a>
             )}

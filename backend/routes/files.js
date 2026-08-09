@@ -83,14 +83,20 @@ router.get('/:fileId/download', async (req, res) => {
       && file.status === 'active'
       && (!file.shared_token_expires_at || new Date(file.shared_token_expires_at) > new Date());
 
-    // Also allow authenticated access via Bearer token
+    // Allow authenticated access via Bearer header, ?auth=<jwt> query param,
+    // or ehc_token cookie (browser <img>/<a> tags can't send Authorization headers)
     const authHeader = req.headers.authorization;
+    const authToken = req.query.auth;
+    const cookieToken = req.cookies && req.cookies.ehc_token;
     let isAuthed = false;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    const tokenToCheck = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : (authToken || cookieToken);
+    if (tokenToCheck) {
       try {
         const jwt = require('jsonwebtoken');
-        const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
-        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        const JWT_SECRET = process.env.JWT_SECRET;
+        if (JWT_SECRET) jwt.verify(tokenToCheck, JWT_SECRET);
         isAuthed = true;
       } catch (e) { /* invalid token */ }
     }
