@@ -13,8 +13,10 @@ const { pickFields } = require('../lib/pickFields');
 const DOCTOR_WRITABLE_FIELDS = [
   'user_id', 'full_name', 'email', 'phone', 'specialty', 'city', 'country',
   'bio', 'consultation_fee', 'experience_years', 'rating', 'review_count',
-  'verification_status', 'profile_pic_url', 'languages', 'education',
-  'certifications', 'availability', 'pmdc_number'
+  'verification_status', 'verification_notes', 'verification_submitted_at',
+  'profile_pic_url', 'image_url', 'languages', 'education',
+  'certifications', 'availability', 'pmdc_number', 'license_number',
+  'license_document_url', 'identity_document_url'
 ];
 
 function isAdmin(user) {
@@ -138,9 +140,11 @@ router.put('/:id', authenticate, async (req, res) => {
     // Non-admins can only update a subset of their own profile fields
     const allowedFields = isAdmin(req.user)
       ? DOCTOR_WRITABLE_FIELDS
-      : ['full_name', 'phone', 'city', 'country', 'bio', 'profile_pic_url',
+      : ['full_name', 'phone', 'city', 'country', 'bio', 'profile_pic_url', 'image_url',
          'consultation_fee', 'experience_years', 'languages', 'education',
-         'certifications', 'availability', 'pmdc_number'];
+         'certifications', 'availability', 'pmdc_number', 'license_number',
+         'license_document_url', 'identity_document_url',
+         'verification_notes', 'verification_submitted_at'];
     await doctor.update(pickFields(req.body, allowedFields));
     res.json(doctor);
   } catch (error) {

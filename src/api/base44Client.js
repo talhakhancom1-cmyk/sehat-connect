@@ -193,9 +193,31 @@ const functions = {
 
 const integrations = {
   Core: {
-    UploadFile: ({ file } = {}) => {
-      console.warn('UploadFile is a stub in the local backend', file?.name);
-      return Promise.resolve({ file_url: '' });
+    UploadFile: async ({ file } = {}) => {
+      if (!file) throw new Error('No file provided');
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = getToken();
+      const resp = await fetch(`${API_BASE_URL}/files/upload`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+      let data = null;
+      try { data = await resp.json(); } catch { /* no JSON */ }
+      if (!resp.ok) {
+        const err = new Error(data?.error || `Upload failed (${resp.status})`);
+        err.status = resp.status;
+        throw err;
+      }
+      // Build the full download URL with token
+      const baseUrl = API_BASE_URL.replace(/\/api$/, '');
+      const fullUrl = data.download_token
+        ? `${baseUrl}${data.file_url}?token=${data.download_token}`
+        : `${baseUrl}${data.file_url}`;
+      return { file_url: fullUrl, ...data };
     },
     ExtractDataFromUploadedFile: () => {
       console.warn('ExtractDataFromUploadedFile is a stub in the local backend');

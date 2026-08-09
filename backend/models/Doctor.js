@@ -43,6 +43,12 @@ const Doctor = sequelize.define('Doctor', {
   profile_pic_url: {
     type: DataTypes.STRING
   },
+  // Virtual field for frontend compatibility — aliases profile_pic_url
+  image_url: {
+    type: DataTypes.VIRTUAL,
+    get() { return this.profile_pic_url; },
+    set(value) { this.setDataValue('profile_pic_url', value); }
+  },
   verification_status: {
     type: DataTypes.ENUM('pending', 'verified', 'suspended'),
     defaultValue: 'pending'
@@ -68,6 +74,10 @@ const Doctor = sequelize.define('Doctor', {
   },
   verification_notes: {
     type: DataTypes.TEXT
+  },
+  verification_submitted_at: {
+    type: DataTypes.DATE,
+    allowNull: true
   },
   rating: {
     type: DataTypes.DECIMAL(3, 2),
