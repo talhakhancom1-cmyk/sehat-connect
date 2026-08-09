@@ -50,7 +50,6 @@ backend/uploads/
 backend/logs/
 
 # Migration artifacts (do not commit)
-base44/
 vps-export/
 scripts/
 generate-pdf.cjs

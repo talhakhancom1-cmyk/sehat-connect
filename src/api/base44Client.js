@@ -226,4 +226,4 @@ const integrations = {
   },
 };
 
-export const base44 = { auth, entities, functions, integrations };
+export const api = { auth, entities, functions, integrations };

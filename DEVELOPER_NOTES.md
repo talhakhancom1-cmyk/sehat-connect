@@ -90,7 +90,7 @@
 - **Icons:** lucide-react
 - **Dates:** moment.js + date-fns
 - **State:** React Context (AuthContext)
-- **API Client:** Custom base44Client.js (fetch-based)
+- **API Client:** Custom API client (fetch-based)
 
 ### Infrastructure
 - **Object Storage:** MinIO (S3-compatible)

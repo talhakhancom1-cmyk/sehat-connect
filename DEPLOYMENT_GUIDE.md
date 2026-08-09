@@ -207,7 +207,7 @@ nginx -t && systemctl reload nginx
 ```bash
 # Check browser console for errors
 # Most common: API returns paginated response but frontend expects array
-# Fix: ensure base44Client.js has toArray() helper (already in latest code)
+# Fix: ensure the API client has toArray() helper (already in latest code)
 
 # Check if backend is running
 pm2 status
