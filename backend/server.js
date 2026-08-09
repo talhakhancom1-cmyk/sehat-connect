@@ -101,6 +101,29 @@ const migrateRoleColumns = async () => {
   }
 };
 
+// Add columns/enum values that were added to models after production tables
+// were first created. Production sync never alters existing tables (data-loss
+// risk), so any new nullable column or enum value must be migrated here —
+// this keeps `git pull` + restart sufficient with no manual DB steps.
+const migrateMissingColumns = async () => {
+  const statements = [
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS delivery_channel VARCHAR(255);`,
+    `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS verification_submitted_at TIMESTAMPTZ;`,
+    `ALTER TYPE enum_messages_type ADD VALUE IF NOT EXISTS 'audio';`,
+    `ALTER TYPE enum_messages_message_type ADD VALUE IF NOT EXISTS 'audio';`,
+  ];
+  for (const sql of statements) {
+    try {
+      await sequelize.query(sql);
+    } catch (error) {
+      // Table/type may not exist yet on a brand-new database (sync creates it
+      // with the column already present) — safe to skip.
+      console.log('ℹ️ Migration statement skipped:', error.message);
+    }
+  }
+};
+
 // Initialize database
 const initializeDatabase = async () => {
   try {
@@ -108,6 +131,7 @@ const initializeDatabase = async () => {
     if (connected) {
       await migrateRoleColumns();
       await migrateMedicalRecordEnums();
+      await migrateMissingColumns();
       await syncDatabase();
     } else {
       console.log('Attempting to create database...');
