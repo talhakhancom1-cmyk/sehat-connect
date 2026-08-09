@@ -1,6 +1,6 @@
 const express = require('express');
 const { Op } = require('sequelize');
-const { Conversation, Message } = require('../models');
+const { Conversation, Message, Doctor } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
@@ -57,8 +57,15 @@ router.get('/conversations', authenticate, async (req, res) => {
     const paginated = filtered.slice(offset, offset + limit);
 
     // Add created_date alias for frontend compatibility
+    // Also enrich with the doctor's profile picture (conversation.doctor_id
+    // stores the doctor's user_id, so we look up Doctor by user_id).
+    const doctorUserIds = [...new Set(paginated.map(c => c.doctor_id).filter(Boolean))];
+    const doctors = doctorUserIds.length ? await Doctor.findAll({ where: { user_id: doctorUserIds } }).catch(() => []) : [];
+    const doctorImageByUserId = {};
+    for (const d of doctors) doctorImageByUserId[d.user_id] = d.profile_pic_url || null;
     const result = paginated.map(c => ({
       ...c.toJSON(),
+      doctor_image: doctorImageByUserId[c.doctor_id] || null,
       created_date: c.created_at,
       updated_date: c.updated_at
     }));
@@ -107,8 +114,10 @@ router.get('/conversations/:conversationId', authenticate, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
+    const doctor = conversation.doctor_id ? await Doctor.findOne({ where: { user_id: conversation.doctor_id } }).catch(() => null) : null;
     res.json({
       ...conversation.toJSON(),
+      doctor_image: doctor?.profile_pic_url || null,
       member_ids: parseMemberIds(conversation.member_ids),
       created_date: conversation.created_at,
       updated_date: conversation.updated_at

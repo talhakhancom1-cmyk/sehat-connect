@@ -69,7 +69,7 @@ export default function Home() {
         ) : nextAppt ? (
           <div className="bg-white rounded-3xl p-5 shadow-warm animate-slide-up">
             <div className="flex items-center gap-4">
-              <DoctorAvatar name={nextAppt.doctor_name} size="lg" round className="ring-2 ring-[#D97757]/20" />
+              <DoctorAvatar name={nextAppt.doctor_name} imageUrl={nextAppt.doctor_image} size="lg" round className="ring-2 ring-[#D97757]/20" />
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-base text-[#1A1A1A] truncate">{nextAppt.doctor_name}</p>
                 <p className="text-xs text-muted-foreground">Doctor</p>

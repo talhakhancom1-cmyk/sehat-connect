@@ -40,7 +40,7 @@ export default function ChatThread() {
   // Refs mirror the call state so the message-subscription callback (which captures
   // values at effect-setup time) always reads the current values.
   const showCallRef = useRef(false);
-  const incomingCallRef = useRef(null);
+  const incomingCallRef = useRef(null);https://www.youtube.com/watch?v=saOHY9ZHyiI&list=RDsaOHY9ZHyiI&start_radio=1&pp=oAcB
   useEffect(() => { showCallRef.current = showCall; }, [showCall]);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
 
@@ -174,6 +174,7 @@ export default function ChatThread() {
   };
 
   const other = otherParty(conversation, user?.id);
+  const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : null;
 
   const handleStartCall = async () => {
     if (!conversation || !user?.id) return;
@@ -240,7 +241,7 @@ export default function ChatThread() {
           <button onClick={() => navigate('/chat')} className="p-2 rounded-full hover:bg-secondary active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
-          <DoctorAvatar name={other.name} size="md" round />
+          <DoctorAvatar name={other.name} imageUrl={otherImageUrl} size="md" round />
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{other.name}</p>
             <p className="text-[10px] text-muted-foreground">Conversation</p>

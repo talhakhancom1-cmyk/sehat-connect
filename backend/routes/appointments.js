@@ -69,7 +69,18 @@ router.get('/', authenticate, async (req, res) => {
       offset,
       limit
     });
-    const result = rows.map(a => ({ ...a.toJSON(), created_date: a.created_at }));
+    // Enrich each appointment with the doctor's profile picture so the frontend
+    // can render the real uploaded photo (appointment.doctor_image) instead of
+    // falling back to a random placeholder.
+    const doctorIds = [...new Set(rows.map(a => a.doctor_id).filter(Boolean))];
+    const doctors = doctorIds.length ? await Doctor.findAll({ where: { id: doctorIds } }).catch(() => []) : [];
+    const doctorImageById = {};
+    for (const d of doctors) doctorImageById[d.id] = d.profile_pic_url || null;
+    const result = rows.map(a => ({
+      ...a.toJSON(),
+      doctor_image: doctorImageById[a.doctor_id] || null,
+      created_date: a.created_at
+    }));
     res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -86,7 +97,8 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!(await canAccessAppointment(appointment, req.user))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    res.json(appointment);
+    const doctor = appointment.doctor_id ? await Doctor.findByPk(appointment.doctor_id).catch(() => null) : null;
+    res.json({ ...appointment.toJSON(), doctor_image: doctor?.profile_pic_url || null });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
