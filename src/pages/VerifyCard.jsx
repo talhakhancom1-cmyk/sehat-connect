@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { QrCode, Search, ShieldCheck, AlertTriangle, Eye, Clock } from 'lucide-react';
 
 export default function VerifyCard() {

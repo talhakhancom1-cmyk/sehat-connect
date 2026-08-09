@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { checkRecordAccess, daysUntilExpiry } from '@/lib/recordAccess';
 import {
   X, FileText, Lock, ShieldCheck, Clock, FileImage, Pill, CalendarDays,
-  Stethoscope, Activity, User, ChevronRight, ClipboardList
+  Stethoscope, Activity, User, ChevronRight
 } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
 

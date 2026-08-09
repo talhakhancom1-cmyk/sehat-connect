@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
-import StatusBadge from '@/components/StatusBadge';
 import EmptyState from '@/components/EmptyState';
 import EncounterForm from '@/components/EncounterForm';
 import { useDoctorProfile } from '@/lib/useRole';

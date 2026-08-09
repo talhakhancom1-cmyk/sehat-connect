@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Bell, Search, Siren, LogOut, Home, Stethoscope, LayoutGrid, MessageCircle, CalendarClock, CalendarCheck, Pill, ShieldAlert, ShieldCheck, Users, CreditCard, Info, CheckCheck } from 'lucide-react';
 import MobileNav from '@/components/MobileNav';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { isAdmin, isDoctor } from '@/lib/useRole';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';

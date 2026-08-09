@@ -19,7 +19,7 @@ const router = express.Router();
 const INVITATION_TTL_DAYS = 7;
 
 // Whitelist for household updates (prevents overwriting head_user_ids, created_by_user_id, etc.)
-const HOUSEHOLD_WRITABLE = ['name', 'country', 'status'];
+const HOUSEHOLD_WRITABLE = ['name', 'country', 'status', 'member_ids', 'head_user_id', 'head_name'];
 
 async function assertHead(householdId, userId) {
   const household = await Household.findByPk(householdId);

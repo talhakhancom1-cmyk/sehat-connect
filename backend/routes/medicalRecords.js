@@ -9,11 +9,12 @@ const { pickFields } = require('../lib/pickFields');
 
 // Fields that can be set on a MedicalRecord
 const RECORD_WRITABLE_FIELDS = [
-  'patient_id', 'patient_name', 'title', 'category', 'type', 'date',
+  'patient_id', 'patient_name', 'title', 'category', 'date',
   'date_precision', 'doctor_name', 'hospital', 'source_hospital', 'notes',
-  'description', 'file_url', 'file_type', 'file_size',
-  'tags', 'provenance', 'source', 'is_shared', 'is_draft', 'status',
-  'consent_id', 'encounter_id', 'verification_status'
+  'file_url', 'file_type', 'provenance', 'is_draft', 'is_amendment',
+  'replaces_version_id', 'reason_for_change',
+  'consent_id', 'encounter_id', 'verification_status',
+  'verified_by_id', 'verified_by_name', 'verified_at', 'shared_with_doctor_ids'
 ];
 
 function isAdmin(user) {

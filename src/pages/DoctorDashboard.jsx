@@ -7,7 +7,7 @@ import StatCard from '@/components/StatCard';
 import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
 import DoctorSummary from '@/components/DoctorSummary';
-import { Calendar, DollarSign, Users, Star, Clock, TrendingUp, Stethoscope, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, TrendingUp, Stethoscope, ArrowRight, ShieldAlert } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

@@ -11,10 +11,10 @@ const { pickFields } = require('../lib/pickFields');
 
 // Fields that can be set on an Appointment
 const APPOINTMENT_WRITABLE_FIELDS = [
-  'patient_id', 'doctor_id', 'doctor_user_id', 'appointment_date',
-  'type', 'status', 'reason', 'notes', 'payment_status',
-  'amount', 'currency', 'payment_method', 'payment_id',
-  'consent_id', 'location', 'duration_minutes', 'follow_up_date'
+  'patient_id', 'doctor_id', 'doctor_name', 'doctor_user_id',
+  'patient_name', 'patient_age', 'patient_gender',
+  'appointment_date', 'time_slot', 'type', 'status', 'reason', 'notes',
+  'consultation_fee', 'payment_status', 'payment_method', 'symptoms'
 ];
 
 function isAdmin(user) {
@@ -119,7 +119,7 @@ router.put('/:id', authenticate, async (req, res) => {
     // Non-admins can only update status and notes, not payment fields
     const allowedFields = isAdmin(req.user)
       ? APPOINTMENT_WRITABLE_FIELDS
-      : ['status', 'notes', 'reason'];
+      : ['status', 'notes', 'reason', 'symptoms'];
     await appointment.update(pickFields(req.body, allowedFields));
     res.json(appointment);
   } catch (error) {

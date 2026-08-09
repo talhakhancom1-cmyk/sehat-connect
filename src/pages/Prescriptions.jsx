@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import StatusBadge from '@/components/StatusBadge';
-import { Pill, Download, Clock, FileText, Plus, ChevronRight } from 'lucide-react';
+import { Pill, Download, Clock, FileText } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { generatePrescriptionPdf } from '@/lib/prescriptionPdf';
 

@@ -1,10 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import {
