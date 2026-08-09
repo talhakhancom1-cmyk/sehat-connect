@@ -44,6 +44,13 @@ const Notification = sequelize.define('Notification', {
   sent_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
+  },
+  delivered_at: {
+    type: DataTypes.DATE
+  },
+  delivery_channel: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   tableName: 'notifications',

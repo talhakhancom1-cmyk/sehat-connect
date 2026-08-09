@@ -44,6 +44,10 @@ function attachPlaceholder(app) {
   app.get('/api/v1/ws/contract', (req, res) => {
     res.json(EVENT_CONTRACT);
   });
+  // Also expose at the unversioned path for convenience
+  app.get('/api/ws/contract', (req, res) => {
+    res.json(EVENT_CONTRACT);
+  });
 }
 
 module.exports = {

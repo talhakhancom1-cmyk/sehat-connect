@@ -1,12 +1,12 @@
 #!/bin/bash
 # ================================================================
 # Sehat Connect — VPS Deployment Script for Ubuntu 26
-# Target: ehcserver.webfrat.com
+# Target: afridiwins.online
 # Stack: Node.js + Express + PostgreSQL 18 + Nginx + PM2 + MinIO + Redis
 # ================================================================
 set -e
 
-DOMAIN="ehcserver.webfrat.com"
+DOMAIN="afridiwins.online"
 APP_DIR="/opt/sehat-connect"
 BACKEND_DIR="$APP_DIR/backend"
 DIST_DIR="$APP_DIR/dist"

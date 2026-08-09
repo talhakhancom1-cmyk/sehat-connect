@@ -4,6 +4,8 @@ const { sequelize } = require('../config/database');
 const User = require('./User');
 const Device = require('./Device');
 const Session = require('./Session');
+const PasswordReset = require('./PasswordReset');
+const ApiKey = require('./ApiKey');
 const MfaFactor = require('./MfaFactor');
 const DoctorCredential = require('./DoctorCredential');
 const Organization = require('./Organization');
@@ -64,6 +66,12 @@ Device.belongsTo(User, { foreignKey: 'user_id', constraints: false });
 
 User.hasMany(Session, { foreignKey: 'user_id', constraints: false });
 Session.belongsTo(User, { foreignKey: 'user_id', constraints: false });
+
+User.hasMany(PasswordReset, { foreignKey: 'user_id', constraints: false });
+PasswordReset.belongsTo(User, { foreignKey: 'user_id', constraints: false });
+
+User.hasMany(ApiKey, { foreignKey: 'created_by_user_id', as: 'apiKeys', constraints: false });
+ApiKey.belongsTo(User, { foreignKey: 'created_by_user_id', as: 'creator', constraints: false });
 
 User.hasMany(MfaFactor, { foreignKey: 'user_id', constraints: false });
 MfaFactor.belongsTo(User, { foreignKey: 'user_id', constraints: false });
@@ -202,6 +210,8 @@ module.exports = {
   User,
   Device,
   Session,
+  PasswordReset,
+  ApiKey,
   MfaFactor,
   DoctorCredential,
   Organization,

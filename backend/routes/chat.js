@@ -2,6 +2,7 @@ const express = require('express');
 const { Op } = require('sequelize');
 const { Conversation, Message } = require('../models');
 const { authenticate } = require('../middleware/auth');
+const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 
 const router = express.Router();
 
@@ -46,13 +47,17 @@ router.get('/conversations', authenticate, async (req, res) => {
       return memberIds.includes(userId) || c.patient_id === userId || c.doctor_id === userId;
     });
 
+    // Apply pagination on the filtered result
+    const { page, per_page, offset, limit } = paginate(req);
+    const paginated = filtered.slice(offset, offset + limit);
+
     // Add created_date alias for frontend compatibility
-    const result = filtered.map(c => ({
+    const result = paginated.map(c => ({
       ...c.toJSON(),
       created_date: c.created_at,
       updated_date: c.updated_at
     }));
-    res.json(result);
+    res.json(buildPaginatedResponse(req, result, filtered.length));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -181,6 +186,9 @@ router.post('/conversations/:conversationId/messages', authenticate, async (req,
       status: 'sent'
     });
     await conversation.update({ last_message_at: new Date() });
+    // Broadcast via Socket.IO if available
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitMessage(conversation.id, message);
     res.status(201).json(message);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -209,6 +217,9 @@ router.post('/conversations/:conversationId/messages/:messageId/read', authentic
       read_at: new Date(),
       read_by_ids: JSON.stringify(readerIds)
     });
+    // Broadcast read receipt via Socket.IO
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitMessageStatus(req.params.conversationId, message.id, 'read', req.user.id);
     res.json(message);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -228,17 +239,19 @@ router.get('/messages', authenticate, async (req, res) => {
     if (req.query.receiver_id) {
       where[Op.or] = [{ receiver_id: req.query.receiver_id }];
     }
-    const messages = await Message.findAll({
+    const { offset, limit } = paginate(req);
+    const { rows, count } = await Message.findAndCountAll({
       where,
       order: [['created_at', 'DESC']],
-      limit: 1000
+      offset,
+      limit
     });
-    const result = messages.map(m => ({
+    const result = rows.map(m => ({
       ...m.toJSON(),
       created_date: m.created_at,
       updated_date: m.updated_at
     }));
-    res.json(result);
+    res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -286,6 +299,9 @@ router.post('/messages', authenticate, async (req, res) => {
       status: 'sent'
     });
     await conversation.update({ last_message_at: new Date() });
+    // Broadcast via Socket.IO if available
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitMessage(conversation.id, message);
     res.status(201).json({
       ...message.toJSON(),
       created_date: message.created_at,

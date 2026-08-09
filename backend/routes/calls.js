@@ -23,6 +23,12 @@ router.post('/', authenticate, async (req, res) => {
       joined_at: new Date(),
       connection_state: 'connected'
     });
+    // Ring the other party via Socket.IO if a receiver is specified
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters && body.receiver_id) {
+      broadcasters.emitCallRinging(room.id, req.user.id, body.receiver_id);
+    }
+    if (broadcasters) broadcasters.emitCallState(room.id, 'ringing');
     res.status(201).json(room);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -80,6 +86,10 @@ router.post('/:callId/join', authenticate, async (req, res) => {
       await room.update({ status: 'active', started_at: room.started_at || new Date() });
     }
 
+    // Broadcast call state change via Socket.IO
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitCallState(room.id, room.status);
+
     res.json({ room, participant });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -104,6 +114,9 @@ router.post('/:callId/leave', authenticate, async (req, res) => {
     if (activeCount === 0) {
       await room.update({ status: 'ended', ended_at: new Date(), ended_reason: 'all_participants_left' });
     }
+    // Broadcast call state change via Socket.IO
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitCallState(room.id, room.status);
     res.json({ message: 'Left call' });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -125,6 +138,9 @@ router.post('/:callId/end', authenticate, async (req, res) => {
       { left_at: new Date(), connection_state: 'disconnected' },
       { where: { call_room_id: room.id, left_at: null } }
     );
+    // Broadcast call ended via Socket.IO
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitCallState(room.id, 'ended');
     res.json(room);
   } catch (error) {
     res.status(400).json({ error: error.message });

@@ -4,6 +4,7 @@ const MedicalRecord = require('../models/MedicalRecord');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
+const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -18,14 +19,15 @@ router.get('/', authenticate, async (req, res) => {
     if (isAdmin(req.user) && req.query.patient_id) where.patient_id = req.query.patient_id;
     if (req.query.category) where.category = req.query.category;
     if (req.query.provenance) where.provenance = req.query.provenance;
-    const limit = Math.min(Number(req.query._limit) || 100, 500);
-    const records = await MedicalRecord.findAll({
+    const { offset, limit } = paginate(req);
+    const { rows, count } = await MedicalRecord.findAndCountAll({
       where,
       order: parseSort(req.query, ['date', 'created_at', 'updated_at'], 'date', 'DESC'),
+      offset,
       limit
     });
-    const result = records.map(r => ({ ...r.toJSON(), created_date: r.created_at }));
-    res.json(result);
+    const result = rows.map(r => ({ ...r.toJSON(), created_date: r.created_at }));
+    res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

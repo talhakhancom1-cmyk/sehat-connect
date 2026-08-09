@@ -4,6 +4,7 @@ const { Prescription, PrescriptionItem, Doctor } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
+const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 
 const router = express.Router();
 
@@ -28,13 +29,15 @@ router.get('/', authenticate, async (req, res) => {
       where[Op.and] = [{ [Op.or]: ownership }];
     }
 
-    const prescriptions = await Prescription.findAll({
+    const { offset, limit } = paginate(req);
+    const { rows, count } = await Prescription.findAndCountAll({
       where,
       order: parseSort(req.query, ['issued_at', 'created_at', 'updated_at'], 'issued_at', 'DESC'),
-      limit: 1000
+      offset,
+      limit
     });
-    const result = prescriptions.map(p => ({ ...p.toJSON(), created_date: p.created_at, date: p.issued_at }));
-    res.json(result);
+    const result = rows.map(p => ({ ...p.toJSON(), created_date: p.created_at, date: p.issued_at }));
+    res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

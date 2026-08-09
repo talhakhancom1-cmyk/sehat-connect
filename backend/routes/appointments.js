@@ -6,6 +6,7 @@ const Doctor = require('../models/Doctor');
 const { authenticate } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
+const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -51,15 +52,16 @@ router.get('/', authenticate, async (req, res) => {
     if (req.query.payment_status) andConditions.push({ payment_status: req.query.payment_status });
 
     const where = andConditions.length ? { [Op.and]: andConditions } : {};
-    const limit = Math.min(Number(req.query._limit) || 100, 500);
+    const { offset, limit } = paginate(req);
 
-    const appointments = await Appointment.findAll({
+    const { rows, count } = await Appointment.findAndCountAll({
       where,
       order: parseSort(req.query, ['appointment_date', 'created_at', 'updated_at', 'status'], 'appointment_date', 'DESC'),
+      offset,
       limit
     });
-    const result = appointments.map(a => ({ ...a.toJSON(), created_date: a.created_at }));
-    res.json(result);
+    const result = rows.map(a => ({ ...a.toJSON(), created_date: a.created_at }));
+    res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

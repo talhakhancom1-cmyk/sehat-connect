@@ -141,9 +141,23 @@ const auth = {
   async updateMe(data) {
     return request('/auth/me', { method: 'PUT', body: data });
   },
-  async resetPasswordRequest() {
-    console.warn('resetPasswordRequest is not supported by the local backend');
-    return { success: true };
+  async resetPasswordRequest(email) {
+    return request('/auth/forgot-password', { method: 'POST', body: { email } });
+  },
+  async resetPassword({ resetToken, newPassword } = {}) {
+    return request('/auth/reset-password', {
+      method: 'POST',
+      body: { token: resetToken, password: newPassword },
+    });
+  },
+  async changePassword({ currentPassword, newPassword } = {}) {
+    return request('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    });
+  },
+  async verifyResetToken(token) {
+    return request('/auth/verify-reset-token', { method: 'POST', body: { token } });
   },
   isAuthenticated() {
     return !!getToken();

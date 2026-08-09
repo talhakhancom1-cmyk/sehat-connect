@@ -1,11 +1,14 @@
 require('dotenv').config({ path: '.env' });
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const { sequelize, testConnection, syncDatabase, createDatabase } = require('./config/database');
 const { User } = require('./models');
+const { attachSocketServer, buildBroadcasters } = require('./lib/realtime');
+const { startScheduler } = require('./lib/scheduler');
 
 // Fail-fast: refuse to boot in production without a real JWT secret
 if (process.env.NODE_ENV === 'production') {
@@ -42,7 +45,7 @@ app.use(cors({
 // Rate limiting on auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 requests per IP per window
+  max: 100, // 100 requests per IP per window (login attempts, register, etc.)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests from this IP, please try again later.' },
@@ -221,6 +224,7 @@ const conversationMemberRoutes = require('./routes/conversationMembers');
 const medicationPlanRoutes = require('./routes/medicationPlans');
 const encountersListRoutes = require('./routes/encountersList');
 const socketEvents = require('./lib/socketEvents');
+const apiKeyRoutes = require('./routes/apiKeys');
 
 // Use routes
 app.use(generalLimiter); // Apply general rate limiting to all API routes
@@ -264,6 +268,7 @@ app.use('/api/medication-plans', medicationPlanRoutes);
 app.use('/api/encounters', encountersListRoutes);
 app.use('/api/audit-events', auditRoutes);
 socketEvents.attachPlaceholder(app);
+app.use('/api/api-keys', apiKeyRoutes);
 
 // Versioned v1 API surface (canonical per Section 10)
 app.use('/api/v1/appointments', appointmentRoutes);
@@ -305,6 +310,7 @@ app.use('/api/v1/conversation-members', conversationMemberRoutes);
 app.use('/api/v1/medication-plans', medicationPlanRoutes);
 app.use('/api/v1/encounters', encountersListRoutes);
 app.use('/api/v1/audit-events', auditRoutes);
+app.use('/api/v1/api-keys', apiKeyRoutes);
 
 // Health check endpoint
 const healthHandler = async (req, res) => {
@@ -340,13 +346,24 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
+
+// Attach Socket.IO realtime server
+const io = attachSocketServer(server, corsOrigin);
+const broadcasters = buildBroadcasters(io);
+app.set('io', io);
+app.set('broadcasters', broadcasters);
+
 const start = async () => {
   await initializeDatabase();
   await normalizeLegacyRoles();
   await seedAdmin();
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`WebSocket server attached at /ws`);
   });
+  // Start background job scheduler (reminders, expiry, cleanup)
+  startScheduler(io);
 };
 start();
 

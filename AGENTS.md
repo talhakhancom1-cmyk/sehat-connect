@@ -49,12 +49,12 @@ The project has been migrated off Base44 and now runs as a standalone Vite front
 
 - Admin account is seeded from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars (not hardcoded).
 - Backend health check: `GET http://localhost:3000/health`.
-- Production health check: `GET https://ehcserver.webfrat.com/health`.
+- Production health check: `GET https://afridiwins.online/health`.
 
 ## Production Deployment
 
 - **VPS**: Ubuntu 26 with Node.js 24, PostgreSQL 18, Nginx, PM2, MinIO, Redis, Certbot.
-- **Domain**: `ehcserver.webfrat.com`.
+- **Domain**: `afridiwins.online`.
 - **Deploy**: `bash deploy.sh` from the project root on the VPS.
 - **Process manager**: PM2 (`pm2 status`, `pm2 logs sehat-connect-backend`).
 - **Reverse proxy**: Nginx serves the built frontend and proxies `/api/` to the backend.

@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const Doctor = require('../models/Doctor');
 const { sequelize } = require('../config/database');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
+const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 
 function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
@@ -14,7 +16,34 @@ function isDoctorSelf(doctor, user) {
   return doctor.user_id === user.id || (doctor.email && user.email && doctor.email === user.email);
 }
 
+// GET /api/v1/doctors/suggest?q= — autocomplete endpoint (must be before /:id)
+router.get('/suggest', authenticate, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.json({ suggestions: [] });
+    }
+    const like = `%${q}%`;
+    const doctors = await Doctor.findAll({
+      where: {
+        [Op.or]: [
+          { full_name: { [Op.iLike]: like } },
+          { specialty: { [Op.iLike]: like } },
+          { city: { [Op.iLike]: like } },
+        ],
+      },
+      attributes: ['id', 'full_name', 'specialty', 'city', 'verification_status'],
+      order: [['rating', 'DESC'], ['full_name', 'ASC']],
+      limit: 10,
+    });
+    res.json({ suggestions: doctors });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all doctors — supports filtering by specialty, city, verification_status, email, user_id
+// Plus full-text search via ?q= and pagination via ?page=&per_page=
 router.get('/', authenticate, async (req, res) => {
   try {
     // Check if database is connected
@@ -35,15 +64,30 @@ router.get('/', authenticate, async (req, res) => {
     if (req.query.email) where.email = req.query.email;
     if (req.query.user_id) where.user_id = req.query.user_id;
 
-    const limit = Math.min(Number(req.query._limit) || 100, 500);
+    // Full-text search across full_name, specialty, bio, city
+    const q = String(req.query.q || '').trim();
+    if (q) {
+      const like = `%${q}%`;
+      where[Op.and] = [{
+        [Op.or]: [
+          { full_name: { [Op.iLike]: like } },
+          { specialty: { [Op.iLike]: like } },
+          { bio: { [Op.iLike]: like } },
+          { city: { [Op.iLike]: like } },
+        ],
+      }];
+    }
 
-    const doctors = await Doctor.findAll({
+    const { offset, limit } = paginate(req);
+
+    const { rows, count } = await Doctor.findAndCountAll({
       where,
       order: parseSort(req.query, ['created_at', 'updated_at', 'rating', 'consultation_fee', 'experience_years'], 'created_at', 'DESC'),
-      limit
+      offset,
+      limit,
     });
-    const result = doctors.map(d => ({ ...d.toJSON(), created_date: d.created_at }));
-    res.json(result);
+    const result = rows.map(d => ({ ...d.toJSON(), created_date: d.created_at }));
+    res.json(buildPaginatedResponse(req, result, count));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
