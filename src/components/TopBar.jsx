@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Bell, Search, Siren, LogOut, Home, Stethoscope, LayoutGrid, MessageCircle, CalendarClock, CalendarCheck, Pill, ShieldAlert, ShieldCheck, Users, CreditCard, Info, CheckCheck } from 'lucide-react';
+import { Bell, Search, Siren, LogOut, Home, Stethoscope, LayoutGrid, MessageCircle, CalendarClock, CalendarCheck, Pill, ShieldAlert, ShieldCheck, Users, CreditCard, Info, CheckCheck, UserCog } from 'lucide-react';
 import MobileNav from '@/components/MobileNav';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { isAdmin, isDoctor } from '@/lib/useRole';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 import { listNotifications, markRead, markAllRead, deepLinkFor, iconFor } from '@/lib/notifications';
 import moment from 'moment';
 
@@ -53,8 +53,12 @@ export default function TopBar() {
           <MobileNav role={role} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0 hover:bg-primary/20 transition-colors">
-                {initial}
+              <button className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0 hover:bg-primary/20 transition-colors overflow-hidden">
+                {user?.profile_pic_url ? (
+                  <img src={authFileUrl(user.profile_pic_url)} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  initial
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -65,6 +69,12 @@ export default function TopBar() {
                 <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase text-primary">{user.role.replace(/_/g, ' ')}</span>
                 }
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => navigate('/profile')}
+                className={cn('cursor-pointer', location.pathname === '/profile' && 'bg-primary/10 text-primary')}>
+                <UserCog className="w-4 h-4 mr-2" /> My Profile
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-xs text-muted-foreground">Switch Portal</DropdownMenuLabel>
               <DropdownMenuItem

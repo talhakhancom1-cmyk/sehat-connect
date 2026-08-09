@@ -11,6 +11,7 @@ import AudioCall from '@/components/chat/AudioCall';
 import IncomingCallOverlay from '@/components/chat/IncomingCallOverlay';
 import { otherParty, listMessages, sendMessage, markConversationRead } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
+import { joinConversation, leaveConversation } from '@/lib/socketClient';
 import { buildCallRoomName } from '@/components/chat/AudioCall';
 import { ChevronLeft, Send, Check, CheckCheck, Phone, PhoneIncoming } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -69,6 +70,10 @@ export default function ChatThread() {
     };
     load();
 
+    // Join the Socket.IO room for this conversation so message:new events for it
+    // reach this client in real time (falls back to the poll below if unavailable).
+    joinConversation(conversationId);
+
     const unsubscribe = base44.entities.Message.subscribe((event) => {
       if (event.type === 'create') {
         const msg = event.data;
@@ -107,7 +112,12 @@ export default function ChatThread() {
       });
     }, 4000);
 
-    return () => { alive = false; unsubscribe(); clearInterval(pollInterval); };
+    return () => {
+      alive = false;
+      unsubscribe();
+      leaveConversation(conversationId);
+      clearInterval(pollInterval);
+    };
   }, [user?.id, conversationId]);
 
   useEffect(() => {

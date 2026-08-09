@@ -27,6 +27,7 @@ import DoctorCalendar from '@/pages/DoctorCalendar';
 import DoctorEncounters from '@/pages/DoctorEncounters';
 import DoctorVerification from '@/pages/DoctorVerification';
 import Onboarding from '@/pages/Onboarding';
+import EditProfile from '@/pages/EditProfile';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -108,6 +109,7 @@ const AuthenticatedApp = () => {
         <Route path="/access" element={<ManageAccess />} />
         <Route path="/cards" element={<HealthCards />} />
         <Route path="/household" element={<Household />} />
+        <Route path="/profile" element={<EditProfile />} />
       </Route>
 
       {/* Doctor Portal — requires doctor role */}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, authFileUrl } from '@/lib/utils';
 import { getDoctorPhoto } from '@/lib/doctorPhotos';
 
 const sizeMap = {
@@ -10,7 +10,7 @@ const sizeMap = {
 };
 
 export default function DoctorAvatar({ name, imageUrl, size = 'md', className, round = false, isOnline = false }) {
-  const photo = imageUrl || getDoctorPhoto(name);
+  const photo = imageUrl ? authFileUrl(imageUrl) : getDoctorPhoto(name);
   const cfg = sizeMap[size] || sizeMap.md;
   const initials = name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'Dr';
 

@@ -1,6 +1,7 @@
+import { onMessageNew } from '@/lib/socketClient';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
-
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -102,10 +103,15 @@ function makeEntityClient(entityName) {
     updateMany: () => Promise.resolve({ count: 0 }),
     delete: (id) => request(`${base}/${id}`, { method: 'DELETE' }),
     bulkCreate: (items) => Promise.all(items.map((item) => request(base, { method: 'POST', body: item }))),
-    subscribe: () => {
-      console.warn(`${entityName}.subscribe is not supported by the local backend`);
-      return () => {};
-    },
+    // Real-time subscription — only Message has a live backend event (message:new
+    // over Socket.IO, see lib/socketClient.js). Other entities fall back to a no-op
+    // so callers using the same interface don't crash; they should poll instead.
+    subscribe: entityName === 'Message'
+      ? (callback) => onMessageNew((message) => callback({ type: 'create', data: message }))
+      : () => {
+          console.warn(`${entityName}.subscribe is not supported by the local backend`);
+          return () => {};
+        },
   };
 }
 
