@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 96%;
+    --foreground: 222 25% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 25% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 25% 13%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 222 25% 13%;
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 243 75% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 243 75% 59%;
+    --radius: 0.875rem;
+    --font-heading: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .dark {
+    --background: 220 16% 96%;
+    --foreground: 222 25% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 25% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 25% 13%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 222 25% 13%;
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 243 75% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 243 75% 59%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body { height: 100%; }
+  #root { min-height: 100%; }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@layer utilities {
+  .shadow-card { box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03); }
+  .shadow-soft { box-shadow: 0 4px 12px -2px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04); }
+  .shadow-soft-lg { box-shadow: 0 8px 24px -4px rgba(0,0,0,0.10), 0 4px 8px -2px rgba(0,0,0,0.04); }
+  .shadow-warm { box-shadow: 0 4px 20px -4px rgba(217,119,87,0.12); }
+  .shadow-warm-lg { box-shadow: 0 8px 28px -6px rgba(217,119,87,0.18); }
+  .glow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .glow-md { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .glow-border { border: 1px solid hsl(220 13% 90%); }
+  .text-glow { text-shadow: none; }
+  .shimmer {
+    background: linear-gradient(90deg, hsl(220 14% 95%) 25%, hsl(220 14% 91%) 50%, hsl(220 14% 95%) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.15); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.12); }
+    60% { transform: scale(1); }
+  }
+  .animate-heartbeat { animation: heartbeat 1.8s ease-in-out infinite; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsl(220 18% 80%) transparent; }
+  .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: hsl(220 18% 80%); border-radius: 3px; }
+  .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
+  .safe-area-left { padding-left: env(safe-area-inset-left, 0px); }
+  .safe-area-right { padding-right: env(safe-area-inset-right, 0px); }
+}
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #fff !important; }
+  .print\:hidden { display: none !important; }
+  .print\:break-after-page { break-after: page; }
+  .print\:py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+  .print\:rounded-none { border-radius: 0 !important; }
+  .print\:py-10 { padding-top: 2.5rem; padding-bottom: 2.5rem; }
+  aside, nav, footer { display: none !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+  section { box-shadow: none !important; }
+}

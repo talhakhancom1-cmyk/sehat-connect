@@ -1,0 +1,16 @@
+{
+  "name": "Eco Health Cloud — Sehat",
+  "short_name": "Sehat",
+  "description": "A secure, global healthcare operating platform for patient-owned records, tele-consultations, and provider collaboration.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#34D399",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

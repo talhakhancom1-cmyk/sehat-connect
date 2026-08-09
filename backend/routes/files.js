@@ -1,0 +1,170 @@
+const express = require('express');
+const multer = require('multer');
+const crypto = require('crypto');
+const { UploadedFile } = require('../models');
+const { authenticate } = require('../middleware/auth');
+const { uploadFile, getFileStream, deleteFile, ensureBucket, buildPublicUrl, getPresignedDownloadUrl } = require('../config/minio');
+
+const router = express.Router();
+
+// Use memory storage so we can stream directly to MinIO
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+});
+
+const DOWNLOAD_SECRET = process.env.FILE_DOWNLOAD_SECRET || 'dev-file-download-secret-do-not-use-in-production';
+
+function signDownloadToken(fileId) {
+  return crypto.createHmac('sha256', DOWNLOAD_SECRET).update(fileId).digest('hex');
+}
+
+// Ensure MinIO bucket exists on module load
+ensureBucket().catch((err) => {
+  console.error('MinIO initialization warning:', err.message);
+});
+
+// POST /api/files/upload
+router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'file is required' });
+    }
+
+    // Generate a unique key for the object
+    const ext = req.file.originalname ? '.' + req.file.originalname.split('.').pop() : '';
+    const key = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+
+    // Upload to MinIO
+    await uploadFile(key, req.file.buffer, req.file.mimetype);
+
+    const record = await UploadedFile.create({
+      owner_id: req.user.id,
+      original_name: req.file.originalname,
+      stored_name: key, // Now stores the MinIO object key
+      mime_type: req.file.mimetype,
+      size_bytes: req.file.size,
+      purpose: req.body && req.body.purpose,
+      status: 'active',
+    });
+
+    const fileUrl = `/api/files/${record.id}/download`;
+    await record.update({ file_url: fileUrl });
+
+    res.status(201).json({
+      id: record.id,
+      file_url: fileUrl,
+      download_token: signDownloadToken(record.id),
+      original_name: record.original_name,
+      mime_type: record.mime_type,
+      size_bytes: record.size_bytes,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// GET /api/files/:fileId/download
+router.get('/:fileId/download', async (req, res) => {
+  try {
+    const file = await UploadedFile.findByPk(req.params.fileId);
+    if (!file || file.status === 'deleted') {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const providedToken = req.query.token;
+    const expectedOwnerToken = signDownloadToken(file.id);
+    const isOwnerToken = providedToken === expectedOwnerToken;
+    const isValidShareToken = file.shared_token
+      && providedToken === file.shared_token
+      && file.status === 'active'
+      && (!file.shared_token_expires_at || new Date(file.shared_token_expires_at) > new Date());
+
+    // Also allow authenticated access via Bearer token
+    const authHeader = req.headers.authorization;
+    let isAuthed = false;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-do-not-use-in-production';
+        jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        isAuthed = true;
+      } catch (e) { /* invalid token */ }
+    }
+
+    if (!isOwnerToken && !isValidShareToken && !isAuthed) {
+      return res.status(403).json({ error: 'Invalid or expired download token' });
+    }
+
+    // Stream the file from MinIO
+    const stream = await getFileStream(file.stored_name);
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    if (file.original_name) {
+      res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
+    }
+    stream.pipe(res);
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ error: 'File content missing in storage' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/files/:fileId/share
+router.post('/:fileId/share', authenticate, async (req, res) => {
+  try {
+    const file = await UploadedFile.findByPk(req.params.fileId);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresInHours = Number(req.body && req.body.expires_in_hours) || 72;
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    await file.update({ shared_token: token, shared_token_expires_at: expiresAt });
+    res.json({
+      file_id: file.id,
+      token,
+      expires_at: expiresAt,
+      share_url: `/api/files/${file.id}/download?token=${token}`,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// POST /api/files/:fileId/revoke
+router.post('/:fileId/revoke', authenticate, async (req, res) => {
+  try {
+    const file = await UploadedFile.findByPk(req.params.fileId);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    await file.update({ shared_token: null, shared_token_expires_at: null, status: 'revoked' });
+    res.json({ message: 'Share revoked' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// DELETE /api/files/:fileId — also remove from MinIO
+router.delete('/:fileId', authenticate, async (req, res) => {
+  try {
+    const file = await UploadedFile.findByPk(req.params.fileId);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    // Delete from MinIO (best-effort)
+    try {
+      await deleteFile(file.stored_name);
+    } catch (e) {
+      console.error('MinIO delete failed (non-fatal):', e.message);
+    }
+    await file.update({ status: 'deleted' });
+    res.json({ message: 'File deleted' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+module.exports = router;
