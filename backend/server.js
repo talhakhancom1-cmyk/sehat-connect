@@ -112,6 +112,14 @@ const migrateMissingColumns = async () => {
     `ALTER TABLE doctors ADD COLUMN IF NOT EXISTS verification_submitted_at TIMESTAMPTZ;`,
     `ALTER TYPE enum_messages_type ADD VALUE IF NOT EXISTS 'audio';`,
     `ALTER TYPE enum_messages_message_type ADD VALUE IF NOT EXISTS 'audio';`,
+    // Schedule: per-day breaks (JSONB array of { date, start, end, reason })
+    `ALTER TABLE schedules ADD COLUMN IF NOT EXISTS day_breaks JSONB DEFAULT '[]'::jsonb;`,
+    // Prescription: fields referenced by the frontend form but missing from the DB
+    `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS diagnosis TEXT;`,
+    `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS follow_up VARCHAR(255);`,
+    `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS is_signed BOOLEAN DEFAULT false;`,
+    `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS signed_at TIMESTAMPTZ;`,
+    `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS doctor_specialty VARCHAR(255);`,
   ];
   for (const sql of statements) {
     try {
