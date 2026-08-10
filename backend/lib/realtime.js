@@ -16,14 +16,21 @@
  */
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
+const { CallRoom, CallParticipant } = require('../models');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
 }
 
+const RING_TIMEOUT_MS = Number(process.env.CALL_RING_TIMEOUT_MS) || 30000;
+
 // Map of user_id -> Set(socket.id) for presence + direct delivery
 const onlineUsers = new Map();
+// callId -> Set<userId> currently in the call room
+const callMembers = new Map();
+// callId -> ring timeout handle
+const callRingTimers = new Map();
 
 function userOnline(userId) {
   return onlineUsers.has(userId) && onlineUsers.get(userId).size > 0;
@@ -155,6 +162,201 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         user_id: userId,
       });
       socket.leave(`call:${call_id}`);
+      // Also clean up the in-memory call member set + DB participant record.
+      const members = callMembers.get(call_id);
+      if (members) {
+        members.delete(userId);
+        if (!members.size) callMembers.delete(call_id);
+      }
+      CallParticipant.update(
+        { left_at: new Date(), connection_state: 'disconnected' },
+        { where: { call_room_id: call_id, user_id: userId, left_at: null } }
+      ).catch(() => {});
+    });
+
+    // ---- Full call lifecycle (WebRTC signaling) ----
+    // Caller initiates a call: creates a CallRoom, rings the target.
+    socket.on('call:initiate', async (payload, ack) => {
+      try {
+        const { to_user_id, call_type = 'audio', conversation_id, appointment_id } = payload || {};
+        if (!to_user_id) return ack && ack({ error: 'to_user_id is required' });
+
+        const room = await CallRoom.create({
+          conversation_id,
+          appointment_id,
+          initiator_id: userId,
+          call_type: call_type === 'video' ? 'video' : 'audio',
+          status: 'ringing',
+          started_at: null,
+        });
+
+        if (!callMembers.has(room.id)) callMembers.set(room.id, new Set());
+        callMembers.get(room.id).add(userId);
+
+        // Ring the target user (only if they have sockets online).
+        const targetSockets = getSocketIdsForUser(to_user_id);
+        targetSockets.forEach((sid) => {
+          io.to(sid).emit('call:ringing', {
+            call_id: room.id,
+            from_user_id: userId,
+            call_type: room.call_type,
+            conversation_id,
+            appointment_id,
+          });
+        });
+
+        // Auto-cancel if not answered within the ring timeout.
+        const timer = setTimeout(async () => {
+          try {
+            const fresh = await CallRoom.findByPk(room.id);
+            if (fresh && fresh.status === 'ringing') {
+              await fresh.update({ status: 'failed', ended_reason: 'no_answer_timeout' });
+              const initSockets = getSocketIdsForUser(userId);
+              initSockets.forEach((sid) => io.to(sid).emit('call:state_changed', { call_id: room.id, status: 'failed', reason: 'no_answer_timeout' }));
+              const tgtSockets = getSocketIdsForUser(to_user_id);
+              tgtSockets.forEach((sid) => io.to(sid).emit('call:state_changed', { call_id: room.id, status: 'failed', reason: 'no_answer_timeout' }));
+              const members = callMembers.get(room.id);
+              if (members) { members.delete(userId); if (!members.size) callMembers.delete(room.id); }
+            }
+          } catch { /* best-effort */ }
+        }, RING_TIMEOUT_MS);
+        callRingTimers.set(room.id, timer);
+
+        ack && ack({ call_id: room.id, status: 'ringing' });
+      } catch (err) {
+        ack && ack({ error: err.message });
+      }
+    });
+
+    // Callee accepts the call — notify the caller to create the offer.
+    socket.on('call:accept', async (payload, ack) => {
+      try {
+        const { call_id } = payload || {};
+        if (!call_id) return ack && ack({ error: 'call_id is required' });
+
+        const room = await CallRoom.findByPk(call_id);
+        if (!room) return ack && ack({ error: 'Call room not found' });
+        if (room.status === 'ended' || room.status === 'failed') {
+          return ack && ack({ error: 'Call is no longer active' });
+        }
+
+        const timer = callRingTimers.get(call_id);
+        if (timer) { clearTimeout(timer); callRingTimers.delete(call_id); }
+
+        if (!callMembers.has(call_id)) callMembers.set(call_id, new Set());
+        callMembers.get(call_id).add(userId);
+
+        let participant = await CallParticipant.findOne({
+          where: { call_room_id: call_id, user_id: userId },
+        });
+        if (participant) {
+          await participant.update({ joined_at: new Date(), left_at: null, connection_state: 'connected' });
+        } else {
+          await CallParticipant.create({
+            call_room_id: call_id,
+            user_id: userId,
+            user_name: '',
+            joined_at: new Date(),
+            connection_state: 'connected',
+          });
+        }
+
+        await room.update({ status: 'connecting' });
+
+        // Tell the caller the callee accepted.
+        const initSockets = getSocketIdsForUser(room.initiator_id);
+        initSockets.forEach((sid) => io.to(sid).emit('call:accepted', { call_id, from_user_id: userId }));
+
+        ack && ack({ call_id, status: 'connecting' });
+      } catch (err) {
+        ack && ack({ error: err.message });
+      }
+    });
+
+    // Callee declines the call.
+    socket.on('call:decline', async (payload, ack) => {
+      try {
+        const { call_id } = payload || {};
+        if (!call_id) return ack && ack({ error: 'call_id is required' });
+
+        const room = await CallRoom.findByPk(call_id);
+        if (!room) return ack && ack({ error: 'Call room not found' });
+
+        const timer = callRingTimers.get(call_id);
+        if (timer) { clearTimeout(timer); callRingTimers.delete(call_id); }
+
+        await room.update({ status: 'ended', ended_at: new Date(), ended_reason: 'declined' });
+        const members = callMembers.get(call_id);
+        if (members) { members.delete(userId); members.delete(room.initiator_id); if (!members.size) callMembers.delete(call_id); }
+
+        const initSockets = getSocketIdsForUser(room.initiator_id);
+        initSockets.forEach((sid) => io.to(sid).emit('call:declined', { call_id, from_user_id: userId }));
+        ack && ack({ call_id, status: 'ended' });
+      } catch (err) {
+        ack && ack({ error: err.message });
+      }
+    });
+
+    // Caller cancels while ringing.
+    socket.on('call:cancel', async (payload, ack) => {
+      try {
+        const { call_id } = payload || {};
+        if (!call_id) return ack && ack({ error: 'call_id is required' });
+
+        const room = await CallRoom.findByPk(call_id);
+        if (!room) return ack && ack({ error: 'Call room not found' });
+
+        const timer = callRingTimers.get(call_id);
+        if (timer) { clearTimeout(timer); callRingTimers.delete(call_id); }
+
+        await room.update({ status: 'ended', ended_at: new Date(), ended_reason: 'cancelled' });
+        const members = callMembers.get(call_id) || new Set();
+        for (const otherId of members) {
+          if (otherId !== userId) {
+            const otherSockets = getSocketIdsForUser(otherId);
+            otherSockets.forEach((sid) => io.to(sid).emit('call:cancelled', { call_id, from_user_id: userId }));
+          }
+        }
+        members.delete(userId);
+        if (!members.size) callMembers.delete(call_id);
+
+        ack && ack({ call_id, status: 'ended' });
+      } catch (err) {
+        ack && ack({ error: err.message });
+      }
+    });
+
+    // Either party ends the whole call.
+    socket.on('call:end', async (payload, ack) => {
+      try {
+        const { call_id } = payload || {};
+        if (!call_id) return ack && ack({ error: 'call_id is required' });
+
+        const room = await CallRoom.findByPk(call_id);
+        if (!room) return ack && ack({ error: 'Call room not found' });
+
+        const timer = callRingTimers.get(call_id);
+        if (timer) { clearTimeout(timer); callRingTimers.delete(call_id); }
+
+        await room.update({ status: 'ended', ended_at: new Date(), ended_reason: 'ended_by_user' });
+        await CallParticipant.update(
+          { left_at: new Date(), connection_state: 'disconnected' },
+          { where: { call_room_id: call_id, left_at: null } }
+        );
+
+        const members = callMembers.get(call_id) || new Set();
+        for (const otherId of members) {
+          if (otherId !== userId) {
+            const otherSockets = getSocketIdsForUser(otherId);
+            otherSockets.forEach((sid) => io.to(sid).emit('call:ended', { call_id, from_user_id: userId }));
+          }
+        }
+        callMembers.delete(call_id);
+
+        ack && ack({ call_id, status: 'ended' });
+      } catch (err) {
+        ack && ack({ error: err.message });
+      }
     });
 
     // ---- Disconnect ----
@@ -162,6 +364,21 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
       removeUserSocket(userId, socket.id);
       if (!userOnline(userId)) {
         socket.broadcast.emit('presence:update', { user_id: userId, online: false });
+      }
+      // Leave any active call rooms and notify other participants.
+      for (const [callId, members] of callMembers.entries()) {
+        if (members.has(userId)) {
+          members.delete(userId);
+          if (!members.size) callMembers.delete(callId);
+          CallParticipant.update(
+            { left_at: new Date(), connection_state: 'disconnected' },
+            { where: { call_room_id: callId, user_id: userId, left_at: null } }
+          ).catch(() => {});
+          for (const otherId of members) {
+            const otherSockets = getSocketIdsForUser(otherId);
+            otherSockets.forEach((sid) => io.to(sid).emit('call:participant_left', { call_id: callId, user_id: userId }));
+          }
+        }
       }
     });
   });

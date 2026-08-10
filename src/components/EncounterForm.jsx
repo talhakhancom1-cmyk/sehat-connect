@@ -9,6 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
+// Converts any date-like value into a valid ISO 8601 string for the backend.
+// Returns null if the value cannot be parsed, so the caller can fall back.
+function toValidIsoDate(value) {
+  if (!value && value !== 0) return null;
+  // Already a valid ISO string or date-only "YYYY-MM-DD" — validate via Date.
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 // Doctor writes the clinical encounter for an appointment. On save, the
 // appointment is transitioned to `completed` (if not already) and the encounter
 // is created; any prescriptions already issued for this appointment are linked.
@@ -23,17 +33,26 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
     follow_up: '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
     if (saving) return;
+    setError('');
+
+    // Validate and normalize the encounter date before anything else.
+    // appointment.appointment_date may be an ISO string, a "YYYY-MM-DD" string,
+    // a Date object, or (in edge cases) an unparseable value like "Invalid date".
+    // We always send a valid ISO 8601 timestamp to the backend.
+    const encounterDate = toValidIsoDate(appointment?.appointment_date) || new Date().toISOString();
+
     setSaving(true);
     try {
       // Transition appointment to completed first (validates via state machine).
       if (appointment.status !== 'completed') {
         const guard = transitionAllowed(appointment, 'completed');
-        if (!guard.ok) { alert(guard.reason); setSaving(false); return; }
+        if (!guard.ok) { setError(guard.reason); setSaving(false); return; }
         await base44.entities.Appointment.update(appointment.id, { status: 'completed' });
       }
 
@@ -45,7 +64,7 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
         patient_name: appointment.patient_name,
         patient_age: appointment.patient_age || null,
         patient_gender: appointment.patient_gender || null,
-        encounter_date: appointment.appointment_date,
+        encounter_date: encounterDate,
         encounter_type: appointment.type || 'video',
         ...form,
         status: 'completed',
@@ -62,14 +81,16 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
         target_type: 'Encounter',
         target_id: encounter.id,
         patient_id: appointment.patient_id,
-        detail: `Encounter for ${appointment.appointment_date} ${appointment.time_slot}`,
+        detail: `Encounter for ${encounterDate} ${appointment.time_slot}`,
       });
 
       onSaved?.();
       onClose?.();
     } catch (err) {
       console.error('Encounter save failed:', err);
-      alert('Could not save encounter: ' + (err?.message || 'Unknown error'));
+      // Surface a clear error in the form instead of letting the raw DB error propagate.
+      const msg = err?.message || 'Could not save the encounter. Please try again.';
+      setError(msg);
     } finally { setSaving(false); }
   };
 
@@ -96,6 +117,11 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
           <Field label="Clinical notes"><Textarea rows={3} value={form.clinical_notes} onChange={e => set('clinical_notes', e.target.value)} /></Field>
           <Field label="Advice"><Textarea rows={2} value={form.advice} onChange={e => set('advice', e.target.value)} /></Field>
           <Field label="Follow up"><Input value={form.follow_up} onChange={e => set('follow_up', e.target.value)} placeholder="e.g. Review in 1 week" /></Field>
+          {error && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
         </div>
         <div className="sticky bottom-0 bg-card border-t border-border p-4 flex gap-2">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>

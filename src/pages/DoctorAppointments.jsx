@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ShieldCheck, Clock, ClipboardList } from 'lucide-react';
 import VideoCall from '@/components/VideoCall';
 import PatientOverviewDialog from '@/components/PatientOverviewDialog';
+import { useCallInitiator } from '@/lib/useCallInitiator';
 
 const tabs = ['all', 'pending', 'confirmed', 'in_progress', 'completed', 'rejected'];
 
@@ -16,7 +17,7 @@ export default function DoctorAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
-  const [activeCall, setActiveCall] = useState(null);
+  const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [doctorEntityId, setDoctorEntityId] = useState(null);
 
@@ -112,11 +113,7 @@ export default function DoctorAppointments() {
                   role="doctor"
                   onJoin={handleAction}
                   onCancel={handleAction}
-                  onVideoCall={(a) => setActiveCall({
-                    roomName: `sehatconnect-${a.id}`,
-                    displayName: user?.full_name || 'Doctor',
-                    doctorName: a.patient_name,
-                  })}
+                  onVideoCall={(a) => startCallFromAppointment(a, user, { video: true })}
                 />
                 {['confirmed', 'completed', 'in_progress'].includes(appt.status) && (
                   <button
@@ -139,10 +136,12 @@ export default function DoctorAppointments() {
 
       {activeCall && (
         <VideoCall
-          roomName={activeCall.roomName}
+          callId={activeCall.callId}
+          role={activeCall.role}
+          remoteUserId={activeCall.remoteUserId}
           displayName={activeCall.displayName}
           doctorName={activeCall.doctorName}
-          onClose={() => setActiveCall(null)}
+          onClose={endCall}
         />
       )}
 

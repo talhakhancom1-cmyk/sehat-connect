@@ -1,98 +1,63 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, PhoneOff } from 'lucide-react';
+import { X, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { useWebRTCCall } from '@/lib/useWebRTCCall';
 
-const JITSI_DOMAIN = 'meet.jit.si';
-const SCRIPT_SRC = `https://${JITSI_DOMAIN}/external_api.js`;
-
-let scriptPromise = null;
-function loadJitsiScript() {
-  if (window.JitsiMeetExternalAPI) return Promise.resolve();
-  if (scriptPromise) return scriptPromise;
-  scriptPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = SCRIPT_SRC;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => { scriptPromise = null; reject(new Error('Failed to load call provider')); };
-    document.head.appendChild(s);
-  });
-  return scriptPromise;
-}
-
-export default function VideoCall({ roomName, displayName, doctorName, onClose }) {
+/**
+ * Video call component using WebRTC + Socket.IO signaling.
+ *
+ * Props:
+ *   callId       — CallRoom id from the signaling server
+ *   role         — 'caller' | 'callee'
+ *   remoteUserId — the other party's user id
+ *   displayName  — this user's name
+ *   doctorName   — the other party's display name (kept for backwards compat)
+ *   onClose      — called when the call ends or the user closes the window
+ */
+export default function VideoCall({ callId, role, remoteUserId, _displayName, doctorName, onClose }) {
   const [seconds, setSeconds] = useState(0);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState(null);
-  const containerRef = useRef(null);
-  const apiRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
-  // Timer
+  const { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, endCall } = useWebRTCCall({
+    callId,
+    role,
+    remoteUserId,
+    video: true,
+    onEnded: onClose,
+  });
+
+  // Attach streams to video elements.
   useEffect(() => {
-    const interval = setInterval(() => setSeconds(s => s + 1), 1000);
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  // Call timer — starts when connected.
+  useEffect(() => {
+    if (status !== 'connected') return;
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [status]);
 
-  // Init Jitsi External API
-  useEffect(() => {
-    let disposed = false;
-    loadJitsiScript()
-      .then(() => {
-        if (disposed || !containerRef.current) return;
-        // Unique, hard-to-guess room for privacy on the free public bridge
-        const safeRoom = `sehatconnect-${String(roomName || 'consult').replace(/[^a-zA-Z0-9-]/g, '')}-${Math.random().toString(36).slice(2, 8)}`;
-        const options = {
-          roomName: safeRoom,
-          parentNode: containerRef.current,
-          configOverwrite: {
-            prejoinPageEnabled: true,
-            startWithAudioMuted: false,
-            startWithVideoMuted: false,
-            requireDisplayName: true,
-            doNotFlipDeck: true,
-          },
-          interfaceConfigOverwrite: {
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            SHOW_JITSI_WATERMARK: false,
-            HIDE_INVITE_MORE_HEADER: true,
-            TOOLBAR_BUTTONS: ['microphone', 'camera', 'desktop', 'fullscreen', 'hangup', 'settings', 'raisehand', 'videoquality', 'filmstrip', 'shortcuts', 'toggle-camera', 'chat'],
-            SETTINGS_SECTIONS: ['devices', 'general'],
-          },
-          userInfo: {
-            displayName: displayName || 'SehatConnect User',
-          },
-        };
-        const api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN, options);
-        apiRef.current = api;
-        api.addEventListener('videoConferenceLeft', () => {
-          if (!disposed && onClose) onClose();
-        });
-        setReady(true);
-      })
-      .catch((e) => { if (!disposed) setError(e.message || 'Call unavailable'); });
-
-    return () => {
-      disposed = true;
-      if (apiRef.current) {
-        try { apiRef.current.dispose(); } catch { /* ignore */ }
-        apiRef.current = null;
-      }
-    };
-  }, [roomName, displayName, onClose]);
-
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  };
+  const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const handleEnd = () => {
-    if (apiRef.current) {
-      try { apiRef.current.executeCommand('hangup'); } catch { /* ignore */ }
-      try { apiRef.current.dispose(); } catch { /* ignore */ }
-      apiRef.current = null;
-    }
-    if (onClose) onClose();
+    endCall();
   };
+
+  const statusLabel =
+    status === 'connected' ? 'Connected' :
+    status === 'ringing' ? 'Ringing…' :
+    status === 'reconnecting' ? 'Reconnecting…' :
+    status === 'failed' ? 'Call failed' :
+    status === 'ended' ? 'Call ended' : 'Connecting…';
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -100,13 +65,13 @@ export default function VideoCall({ roomName, displayName, doctorName, onClose }
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-white">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm font-mono font-medium tabular-nums">{formatTime(seconds)}</span>
+            <div className={'w-2.5 h-2.5 rounded-full ' + (status === 'connected' ? 'bg-green-500 animate-pulse' : status === 'failed' ? 'bg-red-500' : 'bg-amber-400 animate-pulse')} />
+            {status === 'connected' && <span className="text-sm font-mono font-medium tabular-nums">{formatTime(seconds)}</span>}
           </div>
           <div className="h-4 w-px bg-white/20" />
           <div className="text-white">
             <p className="text-sm font-semibold">{doctorName || 'Video Consultation'}</p>
-            <p className="text-[11px] text-white/60">SehatConnect</p>
+            <p className="text-[11px] text-white/60">{statusLabel}</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors active:scale-95">
@@ -114,13 +79,37 @@ export default function VideoCall({ roomName, displayName, doctorName, onClose }
         </button>
       </div>
 
-      {/* Jitsi container */}
-      <div ref={containerRef} className="w-full h-full" />
+      {/* Remote video (full screen) */}
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+      />
+
+      {/* Local video (picture-in-picture) */}
+      <div className="absolute bottom-24 right-4 z-10 w-32 h-44 sm:w-40 sm:h-52 rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg bg-slate-800">
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-cover -scale-x-100"
+        />
+        {!cameraOn && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+            <VideoOff className="w-8 h-8 text-white/40" />
+          </div>
+        )}
+      </div>
 
       {/* Loading / error overlay */}
-      {!ready && !error && (
+      {status !== 'connected' && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
-          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            <p className="text-white/60 text-sm">{statusLabel}</p>
+          </div>
         </div>
       )}
       {error && (
@@ -133,16 +122,45 @@ export default function VideoCall({ roomName, displayName, doctorName, onClose }
         </div>
       )}
 
-      {/* End call button */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center">
-        <button
-          onClick={handleEnd}
-          className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
-        >
-          <PhoneOff className="w-5 h-5" />
-          End Call
-        </button>
-      </div>
+      {/* In-call controls */}
+      {status === 'connected' && (
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-4">
+          <button
+            onClick={toggleMute}
+            className={'p-4 rounded-full transition-all active:scale-95 ' + (muted ? 'bg-white/10 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
+            title={muted ? 'Unmute' : 'Mute'}
+          >
+            {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </button>
+          <button
+            onClick={toggleCamera}
+            className={'p-4 rounded-full transition-all active:scale-95 ' + (cameraOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white/10 text-white')}
+            title={cameraOn ? 'Turn off camera' : 'Turn on camera'}
+          >
+            {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+          </button>
+          <button
+            onClick={handleEnd}
+            className="flex items-center gap-2 px-8 py-4 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
+          >
+            <PhoneOff className="w-5 h-5" />
+            End Call
+          </button>
+        </div>
+      )}
+
+      {/* End call button (when not connected yet) */}
+      {status !== 'connected' && !error && (
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center">
+          <button
+            onClick={handleEnd}
+            className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
+          >
+            <PhoneOff className="w-5 h-5" />
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,15 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router({ mergeParams: true });
 
+// Sanitizes a date-like value into a valid Date or null.
+// Guards against malformed strings like "Invalid date" reaching Postgres.
+function sanitizeDate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const encounter = await Encounter.findOne({
@@ -32,6 +41,13 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(409).json({ error: 'Encounter already exists for this appointment' });
     }
 
+    // Validate encounter_date from the request body — fall back to the
+    // appointment's date, then to "now" so we never send a malformed
+    // timestamp string to Postgres.
+    const encounterDate = sanitizeDate(req.body.encounter_date)
+      || sanitizeDate(appointment.appointment_date)
+      || new Date();
+
     const encounter = await Encounter.create({
       appointment_id: req.params.appointmentId,
       patient_id: appointment.patient_id,
@@ -40,9 +56,10 @@ router.post('/', authenticate, async (req, res) => {
       patient_gender: appointment.patient_gender,
       doctor_id: appointment.doctor_id,
       doctor_name: appointment.doctor_name,
-      encounter_date: appointment.appointment_date,
+      encounter_date: encounterDate,
       encounter_type: appointment.type,
       ...req.body,
+      encounter_date: encounterDate, // re-set after spread so sanitized value wins
       status: req.body.status || 'draft'
     });
     res.status(201).json(encounter);

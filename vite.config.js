@@ -27,6 +27,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // WebSocket signaling server (Socket.IO on the /ws namespace).
       '/ws': {
         target: 'http://localhost:3000',
         changeOrigin: true,

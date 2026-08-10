@@ -49,7 +49,7 @@ The project runs as a standalone Vite frontend + Express/Sequelize backend.
 
 - Admin account is seeded from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars (not hardcoded).
 - Backend health check: `GET http://localhost:3000/health`.
-- Production health check: `GET https://ehcserver.webfrat.com/health`.
+- Production health check: `GET https://afridiwins.online/health`.
 
 ## Production Deployment
 

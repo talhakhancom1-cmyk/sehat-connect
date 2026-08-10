@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, Eye, Star, Video, BadgeCheck, FileText, Pill, QrCode } from 'lucide-react';
 import { cn, formatAppointmentDate } from '@/lib/utils';
 import { getOrCreateForAppointment } from '@/lib/conversations';
+import { useCallInitiator } from '@/lib/useCallInitiator';
 
 const specialties = [
   { name: 'Cardiology', icon: HeartPulse, color: 'bg-rose-50 text-rose-500' },
@@ -25,7 +26,7 @@ export default function Home() {
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeCall, setActiveCall] = useState(null);
+  const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
   const [openingChat, setOpeningChat] = useState(false);
 
   useEffect(() => { if (user?.id) loadData(); }, [user?.id]);
@@ -103,11 +104,7 @@ export default function Home() {
               </button>
               {canJoinCall ? (
                 <button
-                  onClick={() => setActiveCall({
-                    roomName: `sehatconnect-${nextAppt.id}`,
-                    displayName: name,
-                    doctorName: nextAppt.doctor_name,
-                  })}
+                  onClick={() => startCallFromAppointment(nextAppt, user, { video: true })}
                   className="flex-1 py-2.5 rounded-2xl bg-[#D97757] text-white text-sm font-semibold hover:bg-[#C9683F] active:scale-95 transition-all flex items-center justify-center gap-1.5"
                 >
                   <Video className="w-4 h-4" />
@@ -271,10 +268,12 @@ export default function Home() {
 
       {activeCall && (
         <VideoCall
-          roomName={activeCall.roomName}
+          callId={activeCall.callId}
+          role={activeCall.role}
+          remoteUserId={activeCall.remoteUserId}
           displayName={activeCall.displayName}
           doctorName={activeCall.doctorName}
-          onClose={() => setActiveCall(null)}
+          onClose={endCall}
         />
       )}
     </Layout>

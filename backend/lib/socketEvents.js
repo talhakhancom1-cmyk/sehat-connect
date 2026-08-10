@@ -41,12 +41,23 @@ const EVENT_CONTRACT = {
 };
 
 function attachPlaceholder(app) {
+  // Documented event contract — the live Socket.IO server is mounted in
+  // realtime/signaling.js on the /ws namespace.
   app.get('/api/v1/ws/contract', (req, res) => {
     res.json(EVENT_CONTRACT);
   });
   // Also expose at the unversioned path for convenience
   app.get('/api/ws/contract', (req, res) => {
     res.json(EVENT_CONTRACT);
+  });
+  app.get('/api/ws/health', (req, res) => {
+    const ws = app.get('wsNamespace');
+    res.json({
+      status: ws ? 'ok' : 'unavailable',
+      namespace: '/ws',
+      path: '/ws/socket.io',
+      connected_sockets: ws ? ws.sockets.size : 0,
+    });
   });
 }
 

@@ -4,6 +4,31 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Returns the WebRTC ICE server configuration for the frontend.
+// TURN credentials are read from env vars so they're never committed to the
+// frontend bundle. The frontend fetches this at call time.
+router.get('/ice-servers', authenticate, (req, res) => {
+  const iceServers = [];
+  const stunUrls = (process.env.ICE_STUN_URLS || 'stun:stun.l.google.com:19302')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (stunUrls.length) iceServers.push({ urls: stunUrls });
+
+  const turnUrls = (process.env.ICE_TURN_URLS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (turnUrls.length) {
+    iceServers.push({
+      urls: turnUrls,
+      username: process.env.ICE_TURN_USERNAME || '',
+      credential: process.env.ICE_TURN_CREDENTIAL || '',
+    });
+  }
+  res.json({ iceServers });
+});
+
 router.post('/', authenticate, async (req, res) => {
   try {
     const body = req.body || {};

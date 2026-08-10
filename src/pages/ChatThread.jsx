@@ -12,8 +12,8 @@ import IncomingCallOverlay from '@/components/chat/IncomingCallOverlay';
 import { otherParty, listMessages, sendMessage, markConversationRead } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
 import { joinConversation, leaveConversation } from '@/lib/socketClient';
-import { buildCallRoomName } from '@/components/chat/AudioCall';
-import { ChevronLeft, Send, Check, CheckCheck, Phone, PhoneIncoming } from 'lucide-react';
+import { getCallSocket, initiateCall, acceptCall, declineCall, cancelCall } from '@/lib/callSocket';
+import { ChevronLeft, Send, Check, CheckCheck, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Stable chronological sort by created_date only.
@@ -33,8 +33,8 @@ export default function ChatThread() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [showCall, setShowCall] = useState(false);
-  const [callRoom, setCallRoom] = useState(null);
-  const [incomingCall, setIncomingCall] = useState(null); // { room, callerName } when receiving
+  const [callState, setCallState] = useState(null); // { callId, role, remoteUserId }
+  const [incomingCall, setIncomingCall] = useState(null); // { callId, callerName, call_type } when receiving
   const messagesEndRef = useRef(null);
   const initiatingCallRef = useRef(false);
   // Refs mirror the call state so the message-subscription callback (which captures
@@ -46,7 +46,7 @@ export default function ChatThread() {
 
   const closeCall = () => {
     setShowCall(false);
-    setCallRoom(null);
+    setCallState(null);
     initiatingCallRef.current = false;
   };
 
@@ -82,16 +82,9 @@ export default function ChatThread() {
             if (prev.some(m => m.id === msg.id)) return prev;
             return [...prev, msg].sort(byDate);
           });
-          // Incoming voice call signal from the other party.
-          if (msg.type === 'system' && msg.sender_id !== user.id) {
-            if (msg.attachment_url && !initiatingCallRef.current && !showCallRef.current && !incomingCallRef.current) {
-              // New call invitation → show the Accept / Decline overlay (do NOT auto-join).
-              setIncomingCall({ room: msg.attachment_url, callerName: msg.sender_name || otherParty(conversation, user.id).name });
-            } else if (msg.content === '📵 Call declined' && showCallRef.current) {
-              // The other party declined our outgoing call → close it.
-              closeCall();
-            }
-          }
+          // Call signaling is now handled via the WebSocket signaling server
+          // (see the call:ringing listener effect above). We still mark
+          // incoming messages as read here.
           if (msg.receiver_id === user.id && !msg.read) {
             base44.entities.Message.update(msg.id, { read: true }).catch(() => {});
           }
@@ -123,6 +116,41 @@ export default function ChatThread() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // --- Listen for incoming call invitations via the WebSocket signaling server ---
+  useEffect(() => {
+    if (!user?.id || !conversationId) return;
+    const socket = getCallSocket();
+
+    const onRinging = ({ call_id, from_user_id, call_type, conversation_id }) => {
+      // Only show the overlay if the call is for this conversation (or has no
+      // conversation context — rare but possible) and we're not already in a call.
+      if (conversation_id && conversation_id !== conversationId) return;
+      if (showCallRef.current || incomingCallRef.current || initiatingCallRef.current) {
+        // Busy — auto-decline so the caller knows we can't take the call.
+        declineCall(socket, call_id).catch(() => {});
+        return;
+      }
+      const callerName = other?.name || 'Unknown';
+      setIncomingCall({ callId: call_id, callerName, call_type: call_type || 'audio', remoteUserId: from_user_id });
+    };
+
+    // Auto-clear the incoming call overlay if the caller cancels or the ring times out.
+    const onCancelled = ({ call_id }) => {
+      setIncomingCall((prev) => (prev && prev.callId === call_id ? null : prev));
+    };
+
+    socket.on('call:ringing', onRinging);
+    socket.on('call:cancelled', onCancelled);
+    socket.on('call:state_changed', ({ call_id, status }) => {
+      if (status === 'failed') setIncomingCall((prev) => (prev && prev.callId === call_id ? null : prev));
+    });
+
+    return () => {
+      socket.off('call:ringing', onRinging);
+      socket.off('call:cancelled', onCancelled);
+    };
+  }, [user?.id, conversationId, other?.name]);
 
   const handleSend = async () => {
     if (!input.trim() || !user?.id || !conversation) return;
@@ -177,42 +205,67 @@ export default function ChatThread() {
   const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
   const handleStartCall = async () => {
-    if (!conversation || !user?.id) return;
-    const room = buildCallRoomName(conversation.id);
+    if (!conversation || !user?.id || !other?.id) return;
+    if (initiatingCallRef.current || showCall) return;
     initiatingCallRef.current = true;
-    setCallRoom(room);
-    setShowCall(true);
     setIncomingCall(null);
-    // Signal the other party with a system message + a notification so they can pick up.
     try {
-      await sendMessage(conversation, user, '📞 Voice call started', { type: 'system', attachment_url: room });
-      if (other?.id) {
-        createNotification(other.id, 'chat', `📞 Incoming voice call from ${user?.display_name || user?.email || 'User'}`, 'Tap to join the call', {
-          priority: 'high',
-          data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id, call_room: room },
-        });
-      }
+      const socket = getCallSocket();
+      const res = await initiateCall(socket, {
+        to_user_id: other.id,
+        call_type: 'audio',
+        conversation_id: conversation.id,
+        appointment_id: conversation.appointment_id,
+      });
+      setCallState({ callId: res.call_id, role: 'caller', remoteUserId: other.id });
+      setShowCall(true);
+      // Also send a push notification so the callee sees it even if their
+      // socket isn't connected (they'll get the ringing event when they come online).
+      createNotification(other.id, 'chat', `📞 Incoming voice call from ${user?.display_name || user?.full_name || 'User'}`, 'Tap to join the call', {
+        priority: 'high',
+        data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id },
+      }).catch(() => {});
     } catch (e) {
       console.error(e);
+      initiatingCallRef.current = false;
     }
   };
 
-  const joinCall = (room) => {
-    initiatingCallRef.current = false;
-    setIncomingCall(null);
-    setCallRoom(room);
-    setShowCall(true);
+  const joinCall = async (incoming) => {
+    const socket = getCallSocket();
+    try {
+      await acceptCall(socket, incoming.callId);
+      setCallState({ callId: incoming.callId, role: 'callee', remoteUserId: incoming.remoteUserId });
+      setIncomingCall(null);
+      setShowCall(true);
+    } catch (e) {
+      console.error(e);
+      setIncomingCall(null);
+    }
   };
 
   const handleDeclineCall = async () => {
-    const room = incomingCall?.room;
+    const incoming = incomingCall;
     setIncomingCall(null);
-    if (!conversation || !user?.id || !room) return;
+    if (!incoming?.callId) return;
     try {
-      await sendMessage(conversation, user, '📵 Call declined', { type: 'system', attachment_url: room });
+      const socket = getCallSocket();
+      await declineCall(socket, incoming.callId);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleCancelCall = async () => {
+    if (callState?.callId) {
+      try {
+        const socket = getCallSocket();
+        await cancelCall(socket, callState.callId);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    closeCall();
   };
 
   const formatTime = (dateStr) => {
@@ -285,16 +338,12 @@ export default function ChatThread() {
                         ? 'bg-primary text-primary-foreground rounded-br-md'
                         : 'bg-secondary text-foreground rounded-bl-md'
                     )}>
-                      {msg.type === 'system' && msg.attachment_url ? (
-                        <button
-                          onClick={() => joinCall(msg.attachment_url)}
-                          className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 transition-colors"
-                        >
-                          <PhoneIncoming className="w-3.5 h-3.5" />
-                          {msg.content || 'Join voice call'}
-                        </button>
-                      ) : msg.type === 'audio' && msg.attachment_url ? (
+                      {msg.type === 'audio' && msg.attachment_url ? (
                         <VoiceMessage url={msg.attachment_url} mine={isMe} />
+                      ) : msg.type === 'system' ? (
+                        // Legacy system messages (e.g. old call signals) are shown
+                        // as plain text — call signaling now uses WebSockets.
+                        <p className="italic opacity-80">{msg.content}</p>
                       ) : (
                         <p>{msg.content}</p>
                       )}
@@ -350,16 +399,18 @@ export default function ChatThread() {
       {incomingCall && (
         <IncomingCallOverlay
           callerName={incomingCall.callerName}
-          onAccept={() => joinCall(incomingCall.room)}
+          onAccept={() => joinCall(incomingCall)}
           onDecline={handleDeclineCall}
         />
       )}
-      {showCall && callRoom && (
+      {showCall && callState && (
         <AudioCall
-          roomName={callRoom}
+          callId={callState.callId}
+          role={callState.role}
+          remoteUserId={callState.remoteUserId}
           displayName={user?.full_name || user?.email}
           otherName={other?.name}
-          onClose={() => { setShowCall(false); initiatingCallRef.current = false; }}
+          onClose={handleCancelCall}
         />
       )}
     </Layout>

@@ -9,6 +9,7 @@ import { SlidersHorizontal, Calendar } from 'lucide-react';
 import VideoCall from '@/components/VideoCall';
 import PaymentDialog from '@/components/PaymentDialog';
 import { useToast } from '@/components/ui/use-toast';
+import { useCallInitiator } from '@/lib/useCallInitiator';
 
 const tabs = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
 
@@ -18,7 +19,7 @@ export default function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
-  const [activeCall, setActiveCall] = useState(null);
+  const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
   const [payAppt, setPayAppt] = useState(null);
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -40,7 +41,6 @@ export default function Appointments() {
   };
 
   const filtered = tab === 'all' ? appointments : appointments.filter(a => a.status === tab);
-  const name = user?.display_name?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Patient';
 
   return (
     <Layout>
@@ -87,11 +87,7 @@ export default function Appointments() {
                 appointment={appt}
                 onCancel={handleCancel}
                 onPay={(a) => setPayAppt(a)}
-                onVideoCall={(a) => setActiveCall({
-                  roomName: `sehatconnect-${a.id}`,
-                  displayName: name,
-                  doctorName: a.doctor_name,
-                })}
+                onVideoCall={(a) => startCallFromAppointment(a, user, { video: true })}
               />
             ))}
           </div>
@@ -110,10 +106,12 @@ export default function Appointments() {
 
       {activeCall && (
         <VideoCall
-          roomName={activeCall.roomName}
+          callId={activeCall.callId}
+          role={activeCall.role}
+          remoteUserId={activeCall.remoteUserId}
           displayName={activeCall.displayName}
           doctorName={activeCall.doctorName}
-          onClose={() => setActiveCall(null)}
+          onClose={endCall}
         />
       )}
 
