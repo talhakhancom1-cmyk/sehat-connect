@@ -8,8 +8,13 @@ import { io } from 'socket.io-client';
 
 const TOKEN_KEY = 'ehc_token';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// If VITE_WS_URL is set, the WebSocket signaling server runs on a separate
+// VPS (split architecture). Otherwise it's on the same origin as the API.
 // Socket.IO needs the origin (no /api suffix) — the server mounts it at path '/ws'.
-const SOCKET_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '') || undefined;
+const WS_URL = import.meta.env.VITE_WS_URL || '';
+const SOCKET_ORIGIN = WS_URL
+  ? WS_URL.replace(/\/ws\/?$/, '')
+  : API_BASE_URL.replace(/\/api\/?$/, '') || undefined;
 
 let socket = null;
 

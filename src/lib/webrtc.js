@@ -178,7 +178,13 @@ export class WebRTCCall {
 export async function fetchIceServers() {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
   const token = localStorage.getItem('ehc_token');
-  const res = await fetch(`${API_BASE_URL}/calls/ice-servers`, {
+  // In the split architecture, the ICE servers endpoint may be on the
+  // WebSocket server (VITE_WS_URL) instead of the API server.
+  const WS_URL = import.meta.env.VITE_WS_URL || '';
+  const iceUrl = WS_URL
+    ? `${WS_URL.replace(/\/ws\/?$/, '')}/api/calls/ice-servers`
+    : `${API_BASE_URL}/calls/ice-servers`;
+  const res = await fetch(iceUrl, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
