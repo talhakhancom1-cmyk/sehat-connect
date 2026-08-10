@@ -53,9 +53,19 @@ The project runs as a standalone Vite frontend + Express/Sequelize backend.
 
 ## Production Deployment
 
-- **VPS**: Ubuntu with Node.js 22, PostgreSQL 18, Nginx, PM2, MinIO, Redis, Certbot.
-- **Domain**: `ehcserver.webfrat.com`.
+- **Split architecture** (two VPS):
+  - **ehcserver.webfrat.com** (164.132.187.36): main app — frontend + REST API + PostgreSQL + MinIO (new uploads).
+  - **afridiwins.online** (74.208.36.213): WebSocket signaling server + TURN server + MinIO (old uploads).
+- **SSH access**: key-based only (`~/.ssh/id_ed25519`). Password auth disabled.
 - **Deploy**: `bash deploy.sh` from the project root on the VPS.
 - **Process manager**: PM2 (`pm2 status`, `pm2 logs sehat-connect-backend`).
 - **Reverse proxy**: Nginx serves the built frontend and proxies `/api/` to the backend.
 - **SSL**: Certbot/Let's Encrypt.
+
+### Critical: Shared Secrets
+
+Both servers MUST have identical values for these env vars:
+- `JWT_SECRET` — used to sign/verify auth tokens. ehcserver issues tokens; afridiwins verifies them for WebSocket auth.
+- `FILE_DOWNLOAD_SECRET` — used to generate/verify file download tokens. Files on afridiwins must be accessible with tokens generated on ehcserver.
+
+If these secrets mismatch, WebSocket connections fail with "Invalid or expired token" and file downloads return 403 Forbidden.
