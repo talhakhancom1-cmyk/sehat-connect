@@ -104,12 +104,19 @@ export default function ChatThread() {
   const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
   const handleSend = async () => {
-    if (!input.trim() || !user?.id || !conversation) return;
+    if (!input.trim() || !user?.id || !conversation) {
+      console.warn('[ChatThread] handleSend skipped:', { hasInput: !!input.trim(), hasUser: !!user?.id, hasConversation: !!conversation });
+      return;
+    }
     const content = input.trim();
     setInput('');
     setSending(true);
     try {
       const msg = await sendMessage(conversation, user, content);
+      if (!msg || !msg.id) {
+        console.error('[ChatThread] sendMessage returned invalid response:', msg);
+        return;
+      }
       setMessages(prev => {
         if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg].sort(byDate);
@@ -123,7 +130,9 @@ export default function ChatThread() {
         });
       }
     } catch (e) {
-      console.error(e);
+      console.error('[ChatThread] handleSend error:', e);
+      // Restore the input so the user doesn't lose their message
+      setInput(content);
     } finally {
       setSending(false);
     }

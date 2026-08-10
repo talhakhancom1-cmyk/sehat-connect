@@ -41,7 +41,7 @@ export default function TopBar() {
     });
 
     // Also beep on new chat messages (if not in the active chat thread)
-    const unsubMsg = onMessageNew(({ message }) => {
+    const unsubMsg = onMessageNew((message) => {
       // Only beep if the user is not currently viewing the chat thread
       const inChatThread = location.pathname.startsWith('/chat/');
       if (!inChatThread) {
