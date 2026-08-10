@@ -120,3 +120,11 @@ export function onCallRinging(callback) {
   s.on('call:ringing', callback);
   return () => s.off('call:ringing', callback);
 }
+
+/** Subscribe to new notifications. Returns an unsubscribe function. */
+export function onNotificationNew(callback) {
+  const s = getSocket();
+  if (!s) return () => {};
+  s.on('notification:new', callback);
+  return () => s.off('notification:new', callback);
+}

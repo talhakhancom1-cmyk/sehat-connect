@@ -19,6 +19,13 @@ const router = express.Router();
 // All routes require authentication + admin role
 router.use(authenticate, requireAdmin());
 
+// GET /api/v1/email-config/public-flags — public endpoint (no auth)
+// Returns only whether signup OTP is enabled, so the Register page can check.
+// This is intentionally placed BEFORE the router.use(authenticate) above —
+// but Express processes middleware in order, so we need a separate router.
+// Instead, we'll handle it inside the authenticated router and just return
+// minimal info for unauthenticated users via a separate express route in server.js.
+
 // GET /api/v1/email-config/diagnose — full SMTP diagnostic (admin only)
 // Shows stored config, password decryption status, and tests the actual connection
 router.get('/diagnose', async (req, res) => {

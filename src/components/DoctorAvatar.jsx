@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn, authFileUrl } from '@/lib/utils';
-import { getDoctorPhoto } from '@/lib/doctorPhotos';
 
 const sizeMap = {
   sm: { box: 'w-8 h-8', radius: 'rounded-lg', text: 'text-[10px]' },
@@ -10,9 +9,9 @@ const sizeMap = {
 };
 
 export default function DoctorAvatar({ name, imageUrl, size = 'md', className, round = false, isOnline = false }) {
-  const photo = imageUrl ? authFileUrl(imageUrl) : getDoctorPhoto(name);
   const cfg = sizeMap[size] || sizeMap.md;
   const initials = name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'Dr';
+  const photo = imageUrl ? authFileUrl(imageUrl) : null;
 
   return (
     <div
@@ -24,19 +23,21 @@ export default function DoctorAvatar({ name, imageUrl, size = 'md', className, r
         className
       )}
     >
-      <img
-        src={photo}
-        alt={name || 'Doctor'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-        onError={(e) => {
-          e.target.style.display = 'none';
-          e.target.nextSibling.style.display = 'flex';
-        }}
-      />
+      {photo ? (
+        <img
+          src={photo}
+          alt={name || 'Doctor'}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }}
+        />
+      ) : null}
       <span
         className={cn('font-bold text-primary', cfg.text)}
-        style={{ display: 'none', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}
+        style={photo ? { display: 'none', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' } : {}}
       >
         {initials}
       </span>

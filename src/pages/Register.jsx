@@ -46,9 +46,9 @@ export default function Register() {
   const [otpResendTimer, setOtpResendTimer] = useState(0);
   const otpInputRef = useRef(null);
 
-  // Check if OTP is enabled on mount
+  // Check if OTP is enabled on mount (public endpoint, no auth needed)
   useEffect(() => {
-    apiRequest('/email-config').then((data) => {
+    apiRequest('/email-config/public-flags').then((data) => {
       if (data.configured && data.enable_signup_otp) {
         setOtpRequired(true);
       }

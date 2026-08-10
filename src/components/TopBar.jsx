@@ -7,6 +7,8 @@ import { isAdmin, isDoctor } from '@/lib/useRole';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn, authFileUrl } from '@/lib/utils';
 import { listNotifications, markRead, markAllRead, deepLinkFor, iconFor } from '@/lib/notifications';
+import { onNotificationNew, onMessageNew } from '@/lib/socketClient';
+import { playNotificationBeep, primeAudio } from '@/lib/notificationSound';
 import moment from 'moment';
 
 const ICONS = { MessageCircle, CalendarClock, CalendarCheck, Pill, ShieldAlert, ShieldCheck, Users, CreditCard, Info, Bell };
@@ -27,7 +29,31 @@ export default function TopBar() {
   useEffect(() => {
     load();
     const id = setInterval(load, 30000);
-    return () => clearInterval(id);
+
+    // Prime audio on first user interaction (browser autoplay policy)
+    primeAudio();
+
+    // Play beep + reload notifications when a new one arrives in real time
+    const unsubNotif = onNotificationNew((notification) => {
+      console.log('[TopBar] real-time notification:new', notification);
+      playNotificationBeep();
+      load(); // refresh the notification list
+    });
+
+    // Also beep on new chat messages (if not in the active chat thread)
+    const unsubMsg = onMessageNew(({ message }) => {
+      // Only beep if the user is not currently viewing the chat thread
+      const inChatThread = location.pathname.startsWith('/chat/');
+      if (!inChatThread) {
+        playNotificationBeep();
+      }
+    });
+
+    return () => {
+      clearInterval(id);
+      unsubNotif();
+      unsubMsg();
+    };
   }, [load, location.pathname]);
 
   const openNotification = async (n) => {

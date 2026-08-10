@@ -1,29 +1,33 @@
-Add SMTP diagnostic endpoint + full OTP system
+Fix profile picture fallback, add notification beep, fix OTP public flag
 
-Bug A - SMTP diagnostic:
-- New GET /api/email-config/diagnose endpoint that shows:
-  - Stored config (host, port, secure, username, from_email)
-  - Password decryption status (whether JWT_SECRET matches)
-  - Actual SMTP connection test with real error (code, response)
-  - Which env keys are set (EMAIL_ENCRYPTION_KEY, etc.)
-- Admin panel now has a "Run Diagnostic" button that shows
-  all this info inline, auto-runs when a test email fails
-- This replaces guessing with actual evidence: the user can
-  see exactly what's stored, whether the password decrypts,
-  and the specific SMTP error (EAUTH, ETIMEDOUT, etc.)
+#1 Profile picture fallback:
+- Removed lib/doctorPhotos.js which returned random Unsplash stock
+  photos when no profile picture was uploaded.
+- Updated DoctorAvatar.jsx to show initials on a colored circle
+  when no imageUrl is provided, instead of fetching a random photo.
+- Real uploaded photos still display correctly via authFileUrl().
+- All 15 files using DoctorAvatar now show consistent initials fallback.
+- TopBar, IncomingCallOverlay, AudioCall already used initials —
+  no change needed there.
 
-Bug B - OTP system (was completely missing):
-- Created OtpCode model (email, code, purpose, expires_at,
-  used, attempts) with table migration in server.js
-- POST /api/auth/request-otp: generates 6-digit code, stores
-  with 10-min expiry, sends via email. Rate limited (3/10min).
-- POST /api/auth/verify-otp: validates code, checks expiry,
-  max 5 attempts, marks as used on success.
-- Register.jsx now checks if enable_signup_otp is on; if so,
-  sends OTP after form validation and shows a 6-digit input
-  screen before creating the account.
-- Resend timer (60s cooldown), back button, graceful fallback
-  if SMTP isn't configured.
+#4 OTP - public flag endpoint:
+- Added GET /api/email-config/public-flags (no auth required) that
+  returns only { configured, enable_signup_otp } so the Register
+  page can check if OTP is enabled without admin credentials.
+- Updated Register.jsx to use the public endpoint instead of the
+  admin-only /email-config route.
+
+#2 Notification beep sound:
+- Created lib/notificationSound.js using Web Audio API (no external
+  file needed). Plays a subtle two-tone "ding-dong" (880Hz + 1100Hz).
+- Handles browser autoplay restrictions: AudioContext is created
+  lazily, primed on first user interaction (click/touch/keydown).
+- Added onNotificationNew() to socketClient.js to subscribe to the
+  existing 'notification:new' socket event from the backend.
+- TopBar now plays the beep when a real-time notification or chat
+  message arrives (not on page load for old notifications).
+- Only beeps for chat messages if user is NOT in the active chat
+  thread (avoids double-notification when already reading).
 
 Generated with [Devin](https://devin.ai)
 

@@ -283,6 +283,40 @@ const emailConfigRoutes = require('./routes/emailConfig');
 
 // Use routes
 app.use(generalLimiter); // Apply general rate limiting to all API routes
+
+// Public endpoint — returns only whether signup OTP is enabled (no auth needed)
+// Used by the Register page to decide whether to show the OTP step.
+app.get('/api/email-config/public-flags', async (req, res) => {
+  try {
+    const { EmailConfig } = require('./models');
+    const config = await EmailConfig.findOne({
+      where: { is_active: true },
+      order: [['updated_at', 'DESC']],
+    });
+    res.json({
+      configured: !!config,
+      enable_signup_otp: config?.enable_signup_otp || false,
+    });
+  } catch (e) {
+    res.json({ configured: false, enable_signup_otp: false });
+  }
+});
+app.get('/api/v1/email-config/public-flags', async (req, res) => {
+  try {
+    const { EmailConfig } = require('./models');
+    const config = await EmailConfig.findOne({
+      where: { is_active: true },
+      order: [['updated_at', 'DESC']],
+    });
+    res.json({
+      configured: !!config,
+      enable_signup_otp: config?.enable_signup_otp || false,
+    });
+  } catch (e) {
+    res.json({ configured: false, enable_signup_otp: false });
+  }
+});
+
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/medical-records', medicalRecordRoutes);
