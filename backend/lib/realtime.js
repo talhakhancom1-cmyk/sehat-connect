@@ -184,6 +184,13 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         console.log(`[realtime] call:initiate from ${userId} to ${to_user_id} type=${call_type}`);
         if (!to_user_id) return ack && ack({ error: 'to_user_id is required' });
 
+        // Check if the target has Do Not Disturb enabled
+        const targetUser = await User.findByPk(to_user_id, { attributes: ['id', 'do_not_disturb', 'display_name'] });
+        if (targetUser?.do_not_disturb) {
+          console.log(`[realtime] call blocked — target ${to_user_id} has DND enabled`);
+          return ack && ack({ error: 'The doctor is currently unavailable (Do Not Disturb mode). Please try again later or send a message.' });
+        }
+
         const room = await CallRoom.create({
           conversation_id,
           appointment_id,
@@ -450,6 +457,7 @@ function buildBroadcasters(io) {
      */
     emitNotification(userId, notification) {
       const targetSockets = getSocketIdsForUser(userId);
+      console.log(`[realtime] emitNotification to user ${userId} — ${targetSockets.length} socket(s) online, type=${notification?.type || 'unknown'}`);
       targetSockets.forEach((sid) => {
         io.to(sid).emit('notification:new', notification);
       });

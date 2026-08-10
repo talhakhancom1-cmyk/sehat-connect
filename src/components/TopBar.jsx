@@ -36,7 +36,10 @@ export default function TopBar() {
     // Play beep + reload notifications when a new one arrives in real time
     const unsubNotif = onNotificationNew((notification) => {
       console.log('[TopBar] real-time notification:new', notification);
-      playNotificationBeep();
+      // Don't play sound if user has Do Not Disturb enabled
+      if (!user?.do_not_disturb) {
+        playNotificationBeep();
+      }
       load(); // refresh the notification list
     });
 
@@ -44,7 +47,7 @@ export default function TopBar() {
     const unsubMsg = onMessageNew((message) => {
       // Only beep if the user is not currently viewing the chat thread
       const inChatThread = location.pathname.startsWith('/chat/');
-      if (!inChatThread) {
+      if (!inChatThread && !user?.do_not_disturb) {
         playNotificationBeep();
       }
     });
@@ -54,7 +57,7 @@ export default function TopBar() {
       unsubNotif();
       unsubMsg();
     };
-  }, [load, location.pathname]);
+  }, [load, location.pathname, user?.do_not_disturb]);
 
   const openNotification = async (n) => {
     if (!n.read) { await markRead(n.id); load(); }

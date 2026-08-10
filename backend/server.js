@@ -165,6 +165,10 @@ const migrateMissingColumns = async () => {
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_message_id VARCHAR(255);`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;`,
     `ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_by_ids TEXT;`,
+    // Schedule slot duration column
+    `ALTER TABLE schedules ADD COLUMN IF NOT EXISTS slot_duration_minutes INTEGER NOT NULL DEFAULT 30;`,
+    // Do Not Disturb flag on users
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS do_not_disturb BOOLEAN NOT NULL DEFAULT false;`,
   ];
   for (const sql of statements) {
     try {

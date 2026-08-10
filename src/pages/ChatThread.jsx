@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
 import VoiceMessage from '@/components/chat/VoiceMessage';
+import WaitingRoom from '@/components/WaitingRoom';
 import { otherParty, listMessages, sendMessage, markConversationRead } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
 import { joinConversation, leaveConversation } from '@/lib/socketClient';
@@ -31,6 +32,8 @@ export default function ChatThread() {
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [waitingRoom, setWaitingRoom] = useState(null); // { callType: 'video'|'audio' }
+  const [appointment, setAppointment] = useState(null);
   const messagesEndRef = useRef(null);
 
   const { role } = useRole();
@@ -43,6 +46,11 @@ export default function ChatThread() {
         const convo = await base44.entities.Conversation.get(conversationId).catch(() => null);
         if (!alive) return;
         setConversation(convo);
+        // Fetch the appointment linked to this conversation (for waiting room)
+        if (convo?.appointment_id) {
+          const appt = await base44.entities.Appointment.get(convo.appointment_id).catch(() => null);
+          if (alive && appt) setAppointment(appt);
+        }
         const msgs = await listMessages(conversationId);
         if (!alive) return;
         setMessages([...msgs].sort(byDate));
@@ -161,13 +169,64 @@ export default function ChatThread() {
     }
   };
 
-  const handleStartCall = async () => {
-    console.log('[ChatThread] handleStartCall clicked', { callCtx: !!callCtx, conversation: !!conversation, other, user: user?.id });
+  const handleStartCall = async (video = false) => {
+    console.log('[ChatThread] handleStartCall clicked', { callCtx: !!callCtx, conversation: !!conversation, other, user: user?.id, video });
     if (!callCtx) {
       alert('Call system not available. Please refresh the page.');
       return;
     }
-    await callCtx.startCall(conversation, other, user, { video: false });
+
+    // If the user is a patient and there's an appointment, check the waiting room logic
+    const isDoctor = user?.role === 'doctor' || user?.app_role === 'doctor' || role === 'doctor';
+    if (!isDoctor && appointment) {
+      // Check if the appointment time has arrived
+      const apptDate = new Date(appointment.appointment_date);
+      const timeSlot = appointment.time_slot || '';
+      const m = timeSlot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (m) {
+        let h = parseInt(m[1], 10);
+        const min = parseInt(m[2], 10);
+        const ap = m[3].toUpperCase();
+        if (ap === 'PM' && h !== 12) h += 12;
+        if (ap === 'AM' && h === 12) h = 0;
+        apptDate.setHours(h, min, 0, 0);
+      }
+
+      const now = new Date();
+      const EARLY_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
+      const earlyEntryTime = new Date(apptDate.getTime() - EARLY_BUFFER_MS);
+      const isActive = ['confirmed', 'in_progress', 'pending'].includes(appointment.status);
+
+      if (isActive && now.getTime() < apptDate.getTime()) {
+        // Show waiting room (patient is within 10 min or too early)
+        if (now.getTime() >= earlyEntryTime.getTime()) {
+          // Within 10 min — show waiting room with countdown
+          setWaitingRoom({ callType: video ? 'video' : 'audio' });
+          return;
+        } else {
+          // Too early — show waiting room (it will show "too early" message)
+          setWaitingRoom({ callType: video ? 'video' : 'audio' });
+          return;
+        }
+      } else if (!isActive) {
+        // Appointment not active — show waiting room (it will show "ended" message)
+        setWaitingRoom({ callType: video ? 'video' : 'audio' });
+        return;
+      }
+      // Appointment time has arrived and is active — proceed with call
+    }
+
+    await callCtx.startCall(conversation, other, user, { video });
+  };
+
+  const handleJoinFromWaitingRoom = async () => {
+    const video = waitingRoom?.callType === 'video';
+    setWaitingRoom(null);
+    if (!callCtx) {
+      alert('Call system not available. Please refresh the page.');
+      return;
+    }
+    await callCtx.startCall(conversation, other, user, { video });
   };
 
   const formatTime = (dateStr) => {
@@ -202,11 +261,18 @@ export default function ChatThread() {
             <p className="text-[10px] text-muted-foreground">Conversation</p>
           </div>
           <button
-            onClick={handleStartCall}
+            onClick={() => handleStartCall(false)}
             className="p-2.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all"
             title="Voice call"
           >
             <Phone className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleStartCall(true)}
+            className="p-2.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all"
+            title="Video call"
+          >
+            <Video className="w-4 h-4" />
           </button>
         </div>
 
@@ -300,6 +366,16 @@ export default function ChatThread() {
           </button>
         </div>
       </div>
+
+      {/* Virtual Waiting Room — shown when patient tries to call before appointment time */}
+      {waitingRoom && appointment && (
+        <WaitingRoom
+          appointment={appointment}
+          callType={waitingRoom.callType}
+          onJoin={handleJoinFromWaitingRoom}
+          onClose={() => setWaitingRoom(null)}
+        />
+      )}
     </Layout>
   );
 }

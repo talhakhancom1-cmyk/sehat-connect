@@ -703,4 +703,26 @@ router.get('/audit-logs', async (req, res) => {
   }
 });
 
+// POST /api/auth/toggle-dnd — toggle Do Not Disturb mode for the current user
+router.post('/toggle-dnd', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const newValue = !user.do_not_disturb;
+    await user.update({ do_not_disturb: newValue });
+    res.json({ success: true, do_not_disturb: newValue });
+  } catch (error) {
+    console.error('Toggle DND error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

@@ -48,7 +48,19 @@ export function getSocket() {
     socket.on('connect_error', (err) => {
       console.warn('[socketClient] connect_error:', err.message);
     });
-    socket.on('disconnect', (reason) => console.warn('[socketClient] disconnected:', reason));
+    socket.on('disconnect', (reason) => {
+      console.warn('[socketClient] disconnected:', reason);
+      // Socket.IO auto-reconnects by default, but we force it for 'io server disconnect'
+      if (reason === 'io server disconnect') {
+        setTimeout(() => socket.connect(), 1000);
+      }
+    });
+    socket.io.on('reconnect', (attempt) => {
+      console.log('[socketClient] reconnected after', attempt, 'attempts');
+    });
+    socket.io.on('reconnect_attempt', (attempt) => {
+      console.log('[socketClient] reconnect attempt', attempt);
+    });
   } else if (!socket.connected) {
     // Token may have changed (e.g. re-login) — refresh auth before reconnecting.
     console.log('[socketClient] reconnecting existing socket');

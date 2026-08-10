@@ -7,7 +7,7 @@ import StatCard from '@/components/StatCard';
 import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
 import DoctorSummary from '@/components/DoctorSummary';
-import { Calendar, DollarSign, Users, Clock, TrendingUp, Stethoscope, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, TrendingUp, Stethoscope, ArrowRight, ShieldAlert, BellOff, Bell } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -21,6 +21,26 @@ function formatLocalDate(d) {
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  const [dnd, setDnd] = useState(user?.do_not_disturb || false);
+  const [togglingDnd, setTogglingDnd] = useState(false);
+
+  const toggleDnd = async () => {
+    setTogglingDnd(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+      const token = localStorage.getItem('ehc_token');
+      const res = await fetch(`${API_BASE_URL}/auth/toggle-dnd`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) setDnd(data.do_not_disturb);
+    } catch (e) {
+      console.error('Toggle DND failed:', e);
+    } finally {
+      setTogglingDnd(false);
+    }
+  };
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
@@ -98,6 +118,26 @@ export default function DoctorDashboard() {
             </div>
           </div>
         )}
+
+        {/* Do Not Disturb toggle */}
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            {dnd ? <BellOff className="w-5 h-5 text-amber-500" /> : <Bell className="w-5 h-5 text-primary" />}
+            <div>
+              <p className="text-sm font-semibold">Do Not Disturb</p>
+              <p className="text-xs text-muted-foreground">
+                {dnd ? 'Incoming calls are blocked. Notification sounds are muted. Chat messages still arrive.' : 'Calls and notifications work normally.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={toggleDnd}
+            disabled={togglingDnd}
+            className={`relative w-12 h-6 rounded-full transition-colors ${dnd ? 'bg-amber-500' : 'bg-secondary'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${dnd ? 'translate-x-6' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

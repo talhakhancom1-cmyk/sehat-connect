@@ -62,9 +62,26 @@ export default function BookingModal({ doctor, onClose, onConfirm }) {
     const loadAvailability = async () => {
       setLoading(true);
       try {
-        // Match the schedule by the doctor's entity id, falling back to the
-        // legacy user_id-keyed records created before the DoctorSchedule
-        // refactor moved doctor_id to the Doctor entity id.
+        // Try the new available-slots endpoint first (handles slot duration, ranges, breaks, bookings)
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+        const token = localStorage.getItem('ehc_token');
+        const doctorId = doctor.id;
+        try {
+          const res = await fetch(`${API_BASE_URL}/schedules/available-slots?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(selectedDate)}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.schedule) {
+              setSchedule(data.schedule);
+              setBookedSlots(data.booked_slots || []);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch { /* fall back to legacy method */ }
+
+        // Fallback: legacy method (query schedule + appointments separately)
         const scheduleQuery = doctor.user_id
           ? { $or: [{ doctor_id: doctor.id }, { doctor_id: doctor.user_id }] }
           : { doctor_id: doctor.id };

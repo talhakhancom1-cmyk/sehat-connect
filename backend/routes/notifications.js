@@ -33,6 +33,7 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const body = req.body || {};
     const io = req.app.get('io');
+    const broadcasters = req.app.get('broadcasters');
     const notification = await sendNotification({
       user_id: body.user_id || req.user.id,
       type: body.type || 'system',
@@ -41,7 +42,7 @@ router.post('/', authenticate, async (req, res) => {
       data: body.data || {},
       priority: body.priority || 'normal',
       expires_at: body.expires_at,
-    }, io);
+    }, broadcasters || io);
     res.status(201).json({ ...notification.toJSON(), created_date: notification.created_at });
   } catch (error) {
     res.status(400).json({ error: error.message });

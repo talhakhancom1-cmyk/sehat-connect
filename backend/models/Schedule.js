@@ -18,6 +18,11 @@ const Schedule = sequelize.define('Schedule', {
     type: DataTypes.INTEGER,
     defaultValue: 20
   },
+  slot_duration_minutes: {
+    type: DataTypes.INTEGER,
+    defaultValue: 30,
+    comment: 'Duration of each bookable slot in minutes (15, 20, 30, 45, 60)'
+  },
   break_start: {
     type: DataTypes.STRING,
     defaultValue: '01:00 PM'

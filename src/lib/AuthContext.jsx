@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { getSocket, disconnectSocket } from '@/lib/socketClient';
 
 const AuthContext = createContext();
 
@@ -88,6 +89,10 @@ export const AuthProvider = ({ children }) => {
         window.location.href = '/force-change-password';
         return;
       }
+
+      // Initialize the WebSocket connection as soon as the user is authenticated
+      // so that real-time notifications and messages work without manual refresh.
+      try { getSocket(); } catch (e) { console.warn('[AuthContext] socket init failed:', e.message); }
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
@@ -106,6 +111,7 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+    disconnectSocket();
 
     if (isTestMode) {
       localStorage.removeItem('test_user_id');

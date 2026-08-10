@@ -140,6 +140,11 @@ const User = sequelize.define('User', {
     type: DataTypes.JSONB,
     defaultValue: {},
     comment: 'Granular permissions for support/admin roles. Keys: can_view_users, can_reset_passwords, can_impersonate, can_view_tickets, can_view_medical_data'
+  },
+  do_not_disturb: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: 'When true, incoming calls are blocked and notification sounds are muted for this doctor.'
   }
 }, {
   tableName: 'users',

@@ -57,12 +57,18 @@ async function deliverNotification(notification, io = null) {
   const channels = [];
 
   // 1. In-app via Socket.IO (real-time)
+  // `io` can be: the broadcasters object directly, the Express app, or the Socket.IO server.
+  // Broadcasters are attached to the Express app via app.set('broadcasters', ...).
   if (io) {
     try {
-      const broadcasters = io.app?.get?.('broadcasters');
+      const broadcasters = io.emitNotification
+        ? io // it's already the broadcasters object
+        : (io.get?.('broadcasters') || io.app?.get?.('broadcasters'));
       if (broadcasters) {
         broadcasters.emitNotification(notification.user_id, notification.toJSON());
         channels.push('socket');
+      } else {
+        console.warn('[notificationDispatcher] No broadcasters found for notification delivery');
       }
     } catch (err) {
       console.warn('Socket.IO delivery failed:', err.message);

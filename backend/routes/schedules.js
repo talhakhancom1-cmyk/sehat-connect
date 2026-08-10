@@ -1,9 +1,137 @@
 const express = require('express');
-const { Schedule, Doctor } = require('../models');
+const { Schedule, Doctor, Appointment } = require('../models');
+const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
 
 const router = express.Router();
+
+// Convert "01:30 PM" to minutes since midnight
+function slotToMinutes(slot) {
+  if (!slot) return -1;
+  const m = slot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return -1;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ap = m[3].toUpperCase();
+  if (ap === 'PM' && h !== 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+// Convert minutes since midnight to "01:30 PM" format
+function minutesToSlot(mins) {
+  let h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const ap = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ap}`;
+}
+
+// Generate slots from a time range given a slot duration
+function generateSlotsFromRange(startStr, endStr, durationMin) {
+  const start = slotToMinutes(startStr);
+  const end = slotToMinutes(endStr);
+  if (start < 0 || end < 0 || end <= start) return [];
+  const slots = [];
+  for (let t = start; t + durationMin <= end; t += durationMin) {
+    slots.push(minutesToSlot(t));
+  }
+  return slots;
+}
+
+// Check if a slot falls within a break window
+function isSlotInBreak(slot, breakStart, breakEnd) {
+  if (!breakStart || !breakEnd) return false;
+  const s = slotToMinutes(slot);
+  const bs = slotToMinutes(breakStart);
+  const be = slotToMinutes(breakEnd);
+  return s >= bs && s < be;
+}
+
+// GET /api/v1/schedules/available-slots?doctor_id=xxx&date=YYYY-MM-DD
+// Returns available bookable slots for a specific doctor on a specific date,
+// considering the doctor's schedule, breaks, and existing appointments.
+router.get('/available-slots', authenticate, async (req, res) => {
+  try {
+    const { doctor_id, date } = req.query;
+    if (!doctor_id || !date) {
+      return res.status(400).json({ error: 'doctor_id and date are required' });
+    }
+
+    const schedule = await Schedule.findOne({
+      where: { doctor_id, status: 'active' },
+      order: [['updated_at', 'DESC']],
+    });
+
+    if (!schedule) {
+      return res.json({ slots: [], schedule: null });
+    }
+
+    // Map date to day of week key
+    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayKey = dayMap[new Date(date).getDay()];
+
+    const daySchedule = (schedule.days || []).find(d => d.day === dayKey);
+    if (!daySchedule || !daySchedule.enabled) {
+      return res.json({ slots: [], schedule: schedule.toJSON(), reason: 'Doctor not available on this day' });
+    }
+
+    // Get slots: either from time ranges (auto-generated) or manual slots
+    const duration = schedule.slot_duration_minutes || 30;
+    let slots = [];
+
+    if (daySchedule.ranges && daySchedule.ranges.length > 0) {
+      // Auto-generate from time ranges
+      for (const range of daySchedule.ranges) {
+        slots.push(...generateSlotsFromRange(range.start, range.end, duration));
+      }
+    } else {
+      // Use manual slots
+      slots = daySchedule.slots || [];
+    }
+
+    // Filter out break slots
+    const breakStart = schedule.break_start;
+    const breakEnd = schedule.break_end;
+    const dayBreaks = Array.isArray(schedule.day_breaks) ? schedule.day_breaks : [];
+    const dayBreak = dayBreaks.find(b => b.date === date);
+
+    slots = slots.filter(slot => {
+      if (isSlotInBreak(slot, breakStart, breakEnd)) return false;
+      if (dayBreak && isSlotInBreak(slot, dayBreak.start, dayBreak.end)) return false;
+      return true;
+    });
+
+    // Filter out already-booked slots
+    const dayStart = new Date(date + 'T00:00:00');
+    const dayEnd = new Date(date + 'T23:59:59');
+    const bookedAppointments = await Appointment.findAll({
+      where: {
+        doctor_id,
+        time_slot: { [Op.in]: slots },
+        status: { [Op.notIn]: ['cancelled', 'rejected'] },
+        [Op.or]: [
+          { appointment_date: { [Op.gte]: dayStart, [Op.lte]: dayEnd } },
+          { date: { [Op.gte]: dayStart, [Op.lte]: dayEnd } },
+        ],
+      },
+      attributes: ['time_slot'],
+    });
+    const bookedSlots = bookedAppointments.map(a => a.time_slot).filter(Boolean);
+    const availableSlots = slots.filter(s => !bookedSlots.includes(s));
+
+    res.json({
+      slots: availableSlots,
+      booked_slots: bookedSlots,
+      schedule: schedule.toJSON(),
+      slot_duration_minutes: duration,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // GET /api/v1/schedules?doctor_id=xxx
 router.get('/', authenticate, async (req, res) => {
