@@ -47,7 +47,12 @@ export class WebRTCCall {
     const wantVideo = videoOverride !== undefined ? videoOverride : this.video;
     this.localStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: wantVideo,
+      video: wantVideo ? {
+        width: { ideal: 1280, min: 320 },
+        height: { ideal: 720, min: 240 },
+        frameRate: { ideal: 30, min: 15 },
+        facingMode: 'user',
+      } : false,
     });
 
     this.pc = new RTCPeerConnection({
@@ -58,6 +63,32 @@ export class WebRTCCall {
     // Add local tracks to the connection
     for (const track of this.localStream.getTracks()) {
       this.pc.addTrack(track, this.localStream);
+    }
+
+    // Set bandwidth constraints for graceful degradation on weak connections.
+    // Video: 512kbps max (enough for 720p at low FPS, degrades to lower res)
+    // Audio: 64kbps (good quality for voice)
+    try {
+      const videoSender = this.pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (videoSender) {
+        const params = videoSender.getParameters();
+        if (!params.encodings) params.encodings = [{}];
+        // Set max bitrate — browser will auto-degrade resolution/FPS to stay under this
+        params.encodings[0].maxBitrate = 512000; // 512 kbps
+        params.encodings[0].maxFramerate = 30;
+        await videoSender.setParameters(params);
+        console.log('[WebRTC:pc] video bitrate limited to 512kbps');
+      }
+      const audioSender = this.pc.getSenders().find((s) => s.track && s.track.kind === 'audio');
+      if (audioSender) {
+        const params = audioSender.getParameters();
+        if (!params.encodings) params.encodings = [{}];
+        params.encodings[0].maxBitrate = 64000; // 64 kbps
+        await audioSender.setParameters(params);
+        console.log('[WebRTC:pc] audio bitrate limited to 64kbps');
+      }
+    } catch (e) {
+      console.warn('[WebRTC:pc] could not set bitrate constraints:', e.message);
     }
 
     // Route incoming remote tracks to a MediaStream the UI can render.

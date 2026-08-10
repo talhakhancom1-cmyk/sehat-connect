@@ -27,7 +27,17 @@ router.post('/', authenticate, async (req, res) => {
       updateData.allergies = body.allergies || null;
       updateData.gender = body.gender || null;
       updateData.age = body.age ? parseInt(body.age) : null;
-      updateData.date_of_birth = body.date_of_birth || null;
+      // Validate date_of_birth: reject years outside 1900-current year
+      if (body.date_of_birth) {
+        const dobYear = new Date(body.date_of_birth).getFullYear();
+        const currentYear = new Date().getFullYear();
+        if (Number.isNaN(dobYear) || dobYear < 1900 || dobYear > currentYear) {
+          return res.status(400).json({ error: `Invalid date of birth: year must be between 1900 and ${currentYear}` });
+        }
+        updateData.date_of_birth = body.date_of_birth;
+      } else {
+        updateData.date_of_birth = null;
+      }
       updateData.emergency_contact_name = body.emergency_contact_name || null;
       updateData.emergency_contact_phone = body.emergency_contact_phone || null;
       // Ensure role is patient

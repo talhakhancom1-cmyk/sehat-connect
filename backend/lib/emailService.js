@@ -42,11 +42,27 @@ async function getEmailConfig() {
  */
 async function getTransporter() {
   const config = await getEmailConfig();
-  if (!config) return { transporter: null, config: null };
+  if (!config) return { transporter: null, config: null, error: 'No active email configuration found in database' };
 
   // Reuse transporter if config hasn't changed
   if (cachedTransporter && cachedConfigId === config.id) {
     return { transporter: cachedTransporter, config };
+  }
+
+  console.log('[emailService] Creating SMTP transporter', {
+    host: config.smtp_host,
+    port: config.smtp_port,
+    secure: config.smtp_secure,
+    username: config.smtp_username,
+    from_email: config.from_email,
+    password_length: config.smtp_password ? config.smtp_password.length : 0,
+  });
+
+  // Check if password was decrypted successfully
+  if (!config.smtp_password) {
+    const msg = 'SMTP password is empty or could not be decrypted. Check EMAIL_ENCRYPTION_KEY/JWT_SECRET matches the one used when saving.';
+    console.error('[emailService]', msg);
+    return { transporter: null, config, error: msg };
   }
 
   try {
@@ -58,19 +74,36 @@ async function getTransporter() {
         user: config.smtp_username,
         pass: config.smtp_password,
       },
+      // Add timeouts to avoid hanging
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
     });
 
     // Verify the connection
+    console.log('[emailService] Verifying SMTP connection...');
     await transporter.verify();
+    console.log('[emailService] SMTP connection verified successfully');
 
     cachedTransporter = transporter;
     cachedConfigId = config.id;
     return { transporter, config };
   } catch (err) {
-    console.error('[emailService] SMTP connection failed:', err.message);
+    console.error('[emailService] SMTP connection failed:', err.message, {
+      code: err.code,
+      command: err.command,
+      response: err.response,
+    });
     cachedTransporter = null;
     cachedConfigId = null;
-    return { transporter: null, config, error: err.message };
+    // Return a detailed error message
+    let detail = err.message;
+    if (err.code === 'EAUTH') detail = `Authentication failed: ${err.response || err.message}. Check username/password (Gmail may require an app-specific password).`;
+    else if (err.code === 'ECONNECTION') detail = `Could not connect to ${config.smtp_host}:${config.smtp_port}. ${err.message}`;
+    else if (err.code === 'ETIMEDOUT') detail = `Connection timed out to ${config.smtp_host}:${config.smtp_port}. Check port and firewall.`;
+    else if (err.code === 'ESOCKET') detail = `Socket error: ${err.message}. Port ${config.smtp_port} with secure=${config.smtp_secure} — try toggling SSL or changing port (465=SSL, 587=STARTTLS).`;
+    else if (err.code === 'EENVELOPE') detail = `Envelope error: ${err.message}. Check from_email address.`;
+    return { transporter: null, config, error: detail };
   }
 }
 
@@ -89,9 +122,9 @@ function invalidateTransporter() {
  * @returns {Promise<{ success: boolean, error?: string, messageId?: string }>}
  */
 async function sendEmail({ to, subject, html, text, replyTo } = {}) {
-  const { transporter, config } = await getTransporter();
+  const { transporter, config, error: connError } = await getTransporter();
   if (!transporter) {
-    return { success: false, error: 'Email not configured or SMTP connection failed' };
+    return { success: false, error: connError || 'Email not configured or SMTP connection failed' };
   }
 
   if (!to || !subject) {

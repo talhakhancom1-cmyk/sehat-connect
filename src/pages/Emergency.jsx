@@ -118,10 +118,15 @@ export default function Emergency() {
       }
       setLocLoading(false);
     }, (err) => {
-      const msg = err.code === 1 ? 'Location permission denied. Enable it in your browser settings.' : 'Could not get your location. Try again.';
+      let msg;
+      if (err.code === 1) msg = 'Location permission denied. Enable location access in your browser/site settings and try again.';
+      else if (err.code === 2) msg = 'Location unavailable. Your device may have GPS disabled or no signal. Try enabling GPS or moving to an open area.';
+      else if (err.code === 3) msg = 'Location request timed out. Try again, or move to an area with better GPS signal.';
+      else msg = `Location error: ${err.message || 'Unknown error'}`;
+      console.warn('[Emergency] geolocation error:', { code: err.code, message: err.message });
       setLocError(msg);
       setLocLoading(false);
-    }, { enableHighAccuracy: true, timeout: 15000 });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
   }, [fetchHospitals]);
 
   const triggerSOS = () => {
@@ -131,8 +136,70 @@ export default function Emergency() {
     const interval = setInterval(() => {
       count--;
       setCountdown(count);
-      if (count <= 0) { clearInterval(interval); setSosActive(false); setCountdown(3); }
+      if (count <= 0) {
+        clearInterval(interval);
+        setSosActive(false);
+        setCountdown(3);
+        // Notify emergency contacts via SMS with location if available
+        if (contacts.length > 0) {
+          const locText = address ? ` My location: ${address}` : '';
+          const smsBody = encodeURIComponent(`EMERGENCY: I need help.${locText}`);
+          // Open SMS to first contact with pre-filled body
+          window.open(`sms:${contacts[0].phone}?body=${smsBody}`, '_blank');
+        }
+        toast({ title: 'SOS triggered', description: contacts.length > 0 ? `Notifying ${contacts[0].name}...` : 'Add emergency contacts to notify family.' });
+      }
     }, 1000);
+  };
+
+  const shareLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ title: 'Geolocation not supported on this device', variant: 'destructive' });
+      return;
+    }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+      const shareText = `My live location: ${mapsUrl}`;
+
+      // Try Web Share API first (mobile), fallback to clipboard
+      if (navigator.share) {
+        navigator.share({ title: 'My Location', text: shareText, url: mapsUrl })
+          .then(() => toast({ title: 'Location shared' }))
+          .catch(() => {
+            // User cancelled or error — copy to clipboard
+            navigator.clipboard.writeText(shareText).then(() => {
+              toast({ title: 'Location link copied to clipboard' });
+            }).catch(() => {
+              toast({ title: 'Location', description: mapsUrl });
+            });
+          });
+      } else {
+        navigator.clipboard.writeText(shareText).then(() => {
+          toast({ title: 'Location link copied to clipboard', description: mapsUrl });
+        }).catch(() => {
+          toast({ title: 'Your location', description: mapsUrl });
+        });
+      }
+
+      // Also enable location for hospitals
+      setEnabled(true);
+      reverseGeocode(lat, lon);
+      fetchHospitals(lat, lon)
+        .then(list => setHospitals(list.map(h => ({ ...h, eta: etaFor(h.distance) }))))
+        .catch(() => setLocError('Could not fetch nearby hospitals. Try again.'));
+      setLocLoading(false);
+    }, (err) => {
+      let msg;
+      if (err.code === 1) msg = 'Location permission denied. Enable location access in your browser settings.';
+      else if (err.code === 2) msg = 'Location unavailable. Check if GPS is enabled on your device.';
+      else if (err.code === 3) msg = 'Location request timed out. Try again.';
+      else msg = `Location error: ${err.message}`;
+      setLocError(msg);
+      setLocLoading(false);
+      toast({ title: 'Could not get location', description: msg, variant: 'destructive' });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
   };
 
   // Calculate age from date_of_birth if available
@@ -140,9 +207,16 @@ export default function Emergency() {
     if (!dob) return null;
     const d = new Date(dob);
     if (Number.isNaN(d.getTime())) return null;
-    const diff = Date.now() - d.getTime();
-    const ageDate = new Date(diff);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
+    const year = d.getFullYear();
+    // Reject unreasonable dates (year 19999, future dates, pre-1900)
+    if (year < 1900 || year > new Date().getFullYear()) return null;
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const monthDiff = today.getMonth() - d.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
   };
 
   const age = calculateAge(user?.date_of_birth);
@@ -198,7 +272,7 @@ export default function Emergency() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Call Ambulance', icon: Ambulance, color: 'destructive', href: 'tel:1122' },
-            { label: 'Share Location', icon: Share2, color: 'primary', onClick: enableLocation },
+            { label: 'Share Location', icon: Share2, color: 'primary', onClick: shareLocation },
             { label: 'Notify Family', icon: Phone, color: 'primary', href: contacts[0] ? `tel:${contacts[0].phone}` : undefined },
             { label: 'Emergency Chat', icon: MessageSquare, color: 'primary', href: '/chat' },
           ].map(action => {

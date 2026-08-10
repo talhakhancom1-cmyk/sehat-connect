@@ -120,6 +120,8 @@ const migrateMissingColumns = async () => {
     `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS is_signed BOOLEAN DEFAULT false;`,
     `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS signed_at TIMESTAMPTZ;`,
     `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS doctor_specialty VARCHAR(255);`,
+    // Fix invalid date_of_birth values (e.g. year 19999) — set to NULL
+    `UPDATE users SET date_of_birth = NULL WHERE date_of_birth IS NOT NULL AND (EXTRACT(YEAR FROM date_of_birth) < 1900 OR EXTRACT(YEAR FROM date_of_birth) > EXTRACT(YEAR FROM CURRENT_DATE));`,
   ];
   for (const sql of statements) {
     try {

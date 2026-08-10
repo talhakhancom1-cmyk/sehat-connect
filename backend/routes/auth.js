@@ -110,6 +110,14 @@ router.put('/me', async (req, res) => {
         updates[field] = req.body[field];
       }
     });
+    // Validate date_of_birth if provided
+    if (updates.date_of_birth) {
+      const dobYear = new Date(updates.date_of_birth).getFullYear();
+      const currentYear = new Date().getFullYear();
+      if (Number.isNaN(dobYear) || dobYear < 1900 || dobYear > currentYear) {
+        return res.status(400).json({ error: `Invalid date of birth: year must be between 1900 and ${currentYear}` });
+      }
+    }
     await user.update(updates);
     res.json(user);
   } catch (error) {

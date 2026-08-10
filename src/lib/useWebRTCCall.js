@@ -272,7 +272,15 @@ export function useWebRTCCall({ callId, remoteUserId, role, video = false, onEnd
   const switchCamera = useCallback(async () => {
     const call = callRef.current;
     if (!call) return false;
-    return call.switchCamera();
+    const result = await call.switchCamera();
+    if (result) {
+      // Trigger a state update so the local video element re-attaches the
+      // stream with the new camera track. We create a new stream wrapper
+      // to ensure React detects the change.
+      const newStream = new MediaStream(call.localStream.getTracks());
+      setLocalStream(newStream);
+    }
+    return result;
   }, []);
 
   return { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, switchCamera, endCall };

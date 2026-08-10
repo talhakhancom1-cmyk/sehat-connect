@@ -1,22 +1,60 @@
-Fix call regression + harden SMTP save with DOM refs
+Fix SMTP error propagation, age calc, geolocation, camera switch, video quality
 
-Call regression (BLOCKING):
-- User table has display_name and profile_pic_url columns, NOT
-  first_name/last_name/profile_image_url. The previous caller ID
-  fix referenced non-existent columns, causing call:initiate to
-  throw a database error that blocked all calls entirely.
-- Fixed both User.findByPk queries in realtime.js to use the
-  correct column names.
+Bug A - SMTP test email fails:
+- Root cause: getTransporter() captured the real SMTP error from
+  transporter.verify() but sendEmail() ignored it and returned a
+  generic "Email not configured or SMTP connection failed" message.
+- Fix: Propagate the actual error through getTransporter() return
+  value. Added detailed error messages for common failure codes
+  (EAUTH, ECONNECTION, ETIMEDOUT, ESOCKET, EENVELOPE).
+- Added connection/greeting/socket timeouts to avoid hanging.
+- Added logging of SMTP config (host, port, secure, username,
+  password length) and verify() result for diagnosis.
+- Added check for empty/undecryptable password with clear message
+  about EMAIL_ENCRYPTION_KEY/JWT_SECRET mismatch.
 
-SMTP save fix (definitive):
-- Previous formRef approach still relied on React state being
-  current. Now reading critical field values (smtp_host, smtp_username,
-  smtp_password, from_email) directly from DOM input refs at save
-  time, completely bypassing any React state issues.
-- Added type="button" to Save button to prevent implicit form
-  submission behavior.
-- Enhanced logging to show both DOM-read values and state values
-  side-by-side for diagnosis.
+Bug D.1 - Age shows "17974 years":
+- Root cause: DOB "19999-09-09" is a valid JS Date object (year
+  19999), so the NaN check passed. The calculation produced a huge
+  number.
+- Fix: calculateAge() now rejects years < 1900 or > current year.
+  Uses proper year/month/day diff instead of epoch math.
+- Added backend validation in onboarding.js and auth.js to reject
+  DOB with year outside 1900-current year.
+- Added migration in server.js to NULL out existing bad DOB values.
+
+Bug D.2 - "Use live location" fails:
+- Fix: Enhanced geolocation error handling with specific messages
+  for all 3 error codes (denied, unavailable, timeout) plus
+  maximumAge option for faster cached results.
+
+Bug D.3 - Nearest Hospitals:
+- Already using OSM Overpass API (free, no billing needed).
+  No change needed — works once location is enabled.
+
+Bug D.4 - Emergency Contacts:
+- Confirmed: Real CRUD via /api/emergency-contacts with DB
+  persistence. No change needed.
+
+Bug D.5 - Quick Actions:
+- Share Location: Now uses Web Share API (mobile) or clipboard
+  fallback to share actual Google Maps coordinates.
+- Notify Family: Links to tel: of first emergency contact.
+- SOS: Now opens SMS to first contact with location + emergency
+  message after countdown.
+- Emergency Chat: Links to /chat (real chat page).
+
+Bug B - Camera switch not working:
+- Root cause: switchCamera() mutated the stream in-place but
+  React didn't detect the change (same object reference).
+- Fix: Create a new MediaStream wrapper after switching camera
+  and update localStream state so the video element re-attaches.
+
+Bug C - Video call quality:
+- Added resolution constraints: ideal 1280x720, min 320x240,
+  30fps ideal, 15fps min.
+- Added bitrate limits via RTCRtpSender.setParameters: 512kbps
+  video, 64kbps audio. Browser auto-degrades on weak connections.
 
 Generated with [Devin](https://devin.ai)
 
