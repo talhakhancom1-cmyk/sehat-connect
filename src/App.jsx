@@ -51,6 +51,8 @@ import PixelTracker from '@/components/PixelTracker';
 import NotificationsPage from '@/pages/NotificationsPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { CallProvider } from '@/lib/CallContext';
+import GlobalCallOverlay from '@/components/GlobalCallOverlay';
 
 // Redirects admin/doctor users away from the patient Home page to their portal
 const RoleRedirect = ({ children }) => {
@@ -147,16 +149,19 @@ function App() {
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <ErrorBoundary>
-            <ScrollToTop />
-            <PixelTracker />
-            <AuthenticatedApp />
-          </ErrorBoundary>
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
+      <CallProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <ErrorBoundary>
+              <ScrollToTop />
+              <PixelTracker />
+              <AuthenticatedApp />
+              <GlobalCallOverlay />
+            </ErrorBoundary>
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </CallProvider>
     </AuthProvider>
   )
 }

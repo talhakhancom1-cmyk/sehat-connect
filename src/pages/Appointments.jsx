@@ -6,7 +6,6 @@ import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
 import { cn } from '@/lib/utils';
 import { SlidersHorizontal, Calendar } from 'lucide-react';
-import VideoCall from '@/components/VideoCall';
 import PaymentDialog from '@/components/PaymentDialog';
 import { useToast } from '@/components/ui/use-toast';
 import { useCallInitiator } from '@/lib/useCallInitiator';
@@ -103,17 +102,6 @@ export default function Appointments() {
           </div>
         )}
       </div>
-
-      {activeCall && (
-        <VideoCall
-          callId={activeCall.callId}
-          role={activeCall.role}
-          remoteUserId={activeCall.remoteUserId}
-          displayName={activeCall.displayName}
-          doctorName={activeCall.doctorName}
-          onClose={endCall}
-        />
-      )}
 
       {payAppt && (
         <PaymentDialog

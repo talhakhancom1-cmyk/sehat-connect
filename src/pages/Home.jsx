@@ -4,7 +4,6 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import Layout from '@/components/Layout';
 import DoctorAvatar from '@/components/DoctorAvatar';
-import VideoCall from '@/components/VideoCall';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, Eye, Star, Video, BadgeCheck, FileText, Pill, QrCode } from 'lucide-react';
@@ -265,17 +264,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {activeCall && (
-        <VideoCall
-          callId={activeCall.callId}
-          role={activeCall.role}
-          remoteUserId={activeCall.remoteUserId}
-          displayName={activeCall.displayName}
-          doctorName={activeCall.doctorName}
-          onClose={endCall}
-        />
-      )}
     </Layout>
   );
 }

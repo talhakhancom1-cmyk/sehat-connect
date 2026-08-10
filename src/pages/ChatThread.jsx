@@ -3,16 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole } from '@/lib/useRole';
+import { useCall } from '@/lib/CallContext';
 import Layout from '@/components/Layout';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
 import VoiceMessage from '@/components/chat/VoiceMessage';
-import AudioCall from '@/components/chat/AudioCall';
-import IncomingCallOverlay from '@/components/chat/IncomingCallOverlay';
 import { otherParty, listMessages, sendMessage, markConversationRead } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
 import { joinConversation, leaveConversation } from '@/lib/socketClient';
-import { getCallSocket, initiateCall, acceptCall, declineCall, cancelCall } from '@/lib/callSocket';
 import { ChevronLeft, Send, Check, CheckCheck, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,29 +24,14 @@ export default function ChatThread() {
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const callCtx = useCall();
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [showCall, setShowCall] = useState(false);
-  const [callState, setCallState] = useState(null); // { callId, role, remoteUserId }
-  const [incomingCall, setIncomingCall] = useState(null); // { callId, callerName, call_type } when receiving
   const messagesEndRef = useRef(null);
-  const initiatingCallRef = useRef(false);
-  // Refs mirror the call state so the message-subscription callback (which captures
-  // values at effect-setup time) always reads the current values.
-  const showCallRef = useRef(false);
-  const incomingCallRef = useRef(null);
-  useEffect(() => { showCallRef.current = showCall; }, [showCall]);
-  useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
-
-  const closeCall = () => {
-    setShowCall(false);
-    setCallState(null);
-    initiatingCallRef.current = false;
-  };
 
   const { role } = useRole();
 
@@ -120,41 +103,6 @@ export default function ChatThread() {
   const other = otherParty(conversation, user?.id);
   const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
-  // --- Listen for incoming call invitations via the WebSocket signaling server ---
-  useEffect(() => {
-    if (!user?.id || !conversationId) return;
-    const socket = getCallSocket();
-
-    const onRinging = ({ call_id, from_user_id, call_type, conversation_id }) => {
-      // Only show the overlay if the call is for this conversation (or has no
-      // conversation context — rare but possible) and we're not already in a call.
-      if (conversation_id && conversation_id !== conversationId) return;
-      if (showCallRef.current || incomingCallRef.current || initiatingCallRef.current) {
-        // Busy — auto-decline so the caller knows we can't take the call.
-        declineCall(socket, call_id).catch(() => {});
-        return;
-      }
-      const callerName = other?.name || 'Unknown';
-      setIncomingCall({ callId: call_id, callerName, call_type: call_type || 'audio', remoteUserId: from_user_id });
-    };
-
-    // Auto-clear the incoming call overlay if the caller cancels or the ring times out.
-    const onCancelled = ({ call_id }) => {
-      setIncomingCall((prev) => (prev && prev.callId === call_id ? null : prev));
-    };
-
-    socket.on('call:ringing', onRinging);
-    socket.on('call:cancelled', onCancelled);
-    socket.on('call:state_changed', ({ call_id, status }) => {
-      if (status === 'failed') setIncomingCall((prev) => (prev && prev.callId === call_id ? null : prev));
-    });
-
-    return () => {
-      socket.off('call:ringing', onRinging);
-      socket.off('call:cancelled', onCancelled);
-    };
-  }, [user?.id, conversationId, other?.name]);
-
   const handleSend = async () => {
     if (!input.trim() || !user?.id || !conversation) return;
     const content = input.trim();
@@ -205,82 +153,11 @@ export default function ChatThread() {
   };
 
   const handleStartCall = async () => {
-    if (!conversation || !user?.id) {
-      console.warn('Call: conversation or user not ready');
+    if (!callCtx) {
+      alert('Call system not available. Please refresh the page.');
       return;
     }
-    if (!other?.id) {
-      console.warn('Call: other party id is missing', { conversation, other });
-      alert('Could not start call: the other party is not identified in this conversation.');
-      return;
-    }
-    if (initiatingCallRef.current || showCall) return;
-    initiatingCallRef.current = true;
-    setIncomingCall(null);
-    try {
-      const socket = getCallSocket();
-      if (!socket) {
-        console.error('Call: socket not connected');
-        alert('Could not start call: real-time connection is not available. Please refresh and try again.');
-        initiatingCallRef.current = false;
-        return;
-      }
-      const res = await initiateCall(socket, {
-        to_user_id: other.id,
-        call_type: 'audio',
-        conversation_id: conversation.id,
-        appointment_id: conversation.appointment_id,
-      });
-      setCallState({ callId: res.call_id, role: 'caller', remoteUserId: other.id });
-      setShowCall(true);
-      // Also send a push notification so the callee sees it even if their
-      // socket isn't connected (they'll get the ringing event when they come online).
-      createNotification(other.id, 'chat', `📞 Incoming voice call from ${user?.display_name || user?.full_name || 'User'}`, 'Tap to join the call', {
-        priority: 'high',
-        data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id },
-      }).catch(() => {});
-    } catch (e) {
-      console.error('Call failed:', e);
-      alert('Could not start call: ' + (e?.message || 'Unknown error'));
-      initiatingCallRef.current = false;
-    }
-  };
-
-  const joinCall = async (incoming) => {
-    const socket = getCallSocket();
-    try {
-      await acceptCall(socket, incoming.callId);
-      setCallState({ callId: incoming.callId, role: 'callee', remoteUserId: incoming.remoteUserId });
-      setIncomingCall(null);
-      setShowCall(true);
-    } catch (e) {
-      console.error(e);
-      setIncomingCall(null);
-    }
-  };
-
-  const handleDeclineCall = async () => {
-    const incoming = incomingCall;
-    setIncomingCall(null);
-    if (!incoming?.callId) return;
-    try {
-      const socket = getCallSocket();
-      await declineCall(socket, incoming.callId);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleCancelCall = async () => {
-    if (callState?.callId) {
-      try {
-        const socket = getCallSocket();
-        await cancelCall(socket, callState.callId);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    closeCall();
+    await callCtx.startCall(conversation, other, user, { video: false });
   };
 
   const formatTime = (dateStr) => {
@@ -411,23 +288,6 @@ export default function ChatThread() {
           </button>
         </div>
       </div>
-      {incomingCall && (
-        <IncomingCallOverlay
-          callerName={incomingCall.callerName}
-          onAccept={() => joinCall(incomingCall)}
-          onDecline={handleDeclineCall}
-        />
-      )}
-      {showCall && callState && (
-        <AudioCall
-          callId={callState.callId}
-          role={callState.role}
-          remoteUserId={callState.remoteUserId}
-          displayName={user?.full_name || user?.email}
-          otherName={other?.name}
-          onClose={handleCancelCall}
-        />
-      )}
     </Layout>
   );
 }

@@ -6,7 +6,6 @@ import AppointmentCard from '@/components/AppointmentCard';
 import { isAccessExpired } from '@/lib/recordAccess';
 import { cn } from '@/lib/utils';
 import { ShieldCheck, Clock, ClipboardList } from 'lucide-react';
-import VideoCall from '@/components/VideoCall';
 import PatientOverviewDialog from '@/components/PatientOverviewDialog';
 import { useCallInitiator } from '@/lib/useCallInitiator';
 
@@ -133,17 +132,6 @@ export default function DoctorAppointments() {
           </div>
         )}
       </div>
-
-      {activeCall && (
-        <VideoCall
-          callId={activeCall.callId}
-          role={activeCall.role}
-          remoteUserId={activeCall.remoteUserId}
-          displayName={activeCall.displayName}
-          doctorName={activeCall.doctorName}
-          onClose={endCall}
-        />
-      )}
 
       {selectedPatient && (
         <PatientOverviewDialog

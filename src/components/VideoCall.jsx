@@ -15,6 +15,7 @@ import { useWebRTCCall } from '@/lib/useWebRTCCall';
  */
 export default function VideoCall({ callId, role, remoteUserId, _displayName, doctorName, onClose }) {
   const [seconds, setSeconds] = useState(0);
+  const [waiting, setWaiting] = useState(0);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
@@ -46,6 +47,24 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
     return () => clearInterval(interval);
   }, [status]);
 
+  // Waiting timer — auto-close after 45s of no connection.
+  useEffect(() => {
+    if (status === 'connected' || status === 'ended' || status === 'failed') {
+      setWaiting(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setWaiting((w) => {
+        if (w >= 45) {
+          endCall();
+          return 0;
+        }
+        return w + 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status, endCall]);
+
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   const handleEnd = () => {
@@ -54,10 +73,10 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
 
   const statusLabel =
     status === 'connected' ? 'Connected' :
-    status === 'ringing' ? 'Ringing…' :
+    status === 'ringing' ? `Ringing… (${waiting}s)` :
     status === 'reconnecting' ? 'Reconnecting…' :
     status === 'failed' ? 'Call failed' :
-    status === 'ended' ? 'Call ended' : 'Connecting…';
+    status === 'ended' ? 'Call ended' : `Connecting… (${waiting}s)`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
