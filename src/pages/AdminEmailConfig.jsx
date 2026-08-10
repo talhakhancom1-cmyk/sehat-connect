@@ -216,10 +216,31 @@ export default function AdminEmailConfig() {
       setTestResult({ success: true, message: result.message });
       toast({ title: 'Test email sent!', description: `Check ${testEmail}` });
     } catch (e) {
-      setTestResult({ success: false, message: String(e?.message || e) });
-      toast({ title: 'Test email failed', description: String(e?.message || e), variant: 'destructive' });
+      const msg = String(e?.message || e);
+      setTestResult({ success: false, message: msg });
+      toast({ title: 'Test email failed', description: msg, variant: 'destructive' });
+      // Auto-run diagnostic to show the real error
+      runDiagnose();
     } finally {
       setTesting(false);
+    }
+  };
+
+  const [diagnoseResult, setDiagnoseResult] = useState(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  const runDiagnose = async () => {
+    setDiagnosing(true);
+    setDiagnoseResult(null);
+    try {
+      const result = await apiRequest('/email-config/diagnose');
+      setDiagnoseResult(result);
+      console.log('[SMTP] diagnostic result:', result);
+    } catch (e) {
+      setDiagnoseResult({ error: String(e?.message || e) });
+      toast({ title: 'Diagnostic failed', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setDiagnosing(false);
     }
   };
 
@@ -463,6 +484,67 @@ export default function AdminEmailConfig() {
                   <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                     {testResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
                     <span>{testResult.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SMTP Diagnostic */}
+            {config && (
+              <div className="bg-card rounded-2xl p-5 shadow-card space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                    SMTP Diagnostic
+                  </h3>
+                  <Button onClick={runDiagnose} disabled={diagnosing} variant="outline" size="sm" className="flex items-center gap-1.5">
+                    {diagnosing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    {diagnosing ? 'Running…' : 'Run Diagnostic'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Shows the stored config, password decryption status, and tests the actual SMTP connection. Check browser console for full details.
+                </p>
+                {diagnoseResult && (
+                  <div className="space-y-2">
+                    {!diagnoseResult.configured ? (
+                      <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">
+                        {diagnoseResult.message || 'Not configured'}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-3 rounded-lg bg-secondary/30 text-xs space-y-1.5 font-mono">
+                          <div className="font-semibold text-sm mb-1">Stored Config:</div>
+                          <div>Host: {diagnoseResult.config?.smtp_host}</div>
+                          <div>Port: {diagnoseResult.config?.smtp_port}</div>
+                          <div>Secure: {String(diagnoseResult.config?.smtp_secure)}</div>
+                          <div>Username: {diagnoseResult.config?.smtp_username}</div>
+                          <div>From: {diagnoseResult.config?.from_email}</div>
+                          <div>Active: {String(diagnoseResult.config?.is_active)}</div>
+                        </div>
+                        <div className={`p-3 rounded-lg text-xs space-y-1.5 font-mono ${diagnoseResult.password?.decryptable ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                          <div className="font-semibold text-sm mb-1">Password:</div>
+                          <div>Stored: {String(diagnoseResult.password?.stored)}</div>
+                          <div>Encrypted: {String(diagnoseResult.password?.looks_encrypted)}</div>
+                          <div>Decryptable: {String(diagnoseResult.password?.decryptable)}</div>
+                          <div>Length: {diagnoseResult.password?.decrypted_length || 0} chars</div>
+                        </div>
+                        <div className={`p-3 rounded-lg text-xs space-y-1.5 font-mono ${diagnoseResult.smtp_test?.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                          <div className="font-semibold text-sm mb-1">SMTP Connection Test:</div>
+                          <div>Success: {String(diagnoseResult.smtp_test?.success)}</div>
+                          {diagnoseResult.smtp_test?.message && <div>Message: {diagnoseResult.smtp_test.message}</div>}
+                          {diagnoseResult.smtp_test?.error && <div>Error: {diagnoseResult.smtp_test.error}</div>}
+                          {diagnoseResult.smtp_test?.code && <div>Code: {diagnoseResult.smtp_test.code}</div>}
+                          {diagnoseResult.smtp_test?.response && <div>Response: {diagnoseResult.smtp_test.response}</div>}
+                        </div>
+                        <div className="p-3 rounded-lg bg-secondary/30 text-xs space-y-1.5 font-mono">
+                          <div className="font-semibold text-sm mb-1">Env Keys:</div>
+                          <div>EMAIL_ENCRYPTION_KEY: {String(diagnoseResult.env?.EMAIL_ENCRYPTION_KEY_set)}</div>
+                          <div>FILE_DOWNLOAD_SECRET: {String(diagnoseResult.env?.FILE_DOWNLOAD_SECRET_set)}</div>
+                          <div>JWT_SECRET: {String(diagnoseResult.env?.JWT_SECRET_set)}</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

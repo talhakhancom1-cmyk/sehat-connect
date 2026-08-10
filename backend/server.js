@@ -122,6 +122,19 @@ const migrateMissingColumns = async () => {
     `ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS doctor_specialty VARCHAR(255);`,
     // Fix invalid date_of_birth values (e.g. year 19999) — set to NULL
     `UPDATE users SET date_of_birth = NULL WHERE date_of_birth IS NOT NULL AND (EXTRACT(YEAR FROM date_of_birth) < 1900 OR EXTRACT(YEAR FROM date_of_birth) > EXTRACT(YEAR FROM CURRENT_DATE));`,
+    // OTP codes table
+    `CREATE TABLE IF NOT EXISTS otp_codes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email VARCHAR(255) NOT NULL,
+      code VARCHAR(10) NOT NULL,
+      purpose VARCHAR(50) NOT NULL DEFAULT 'signup',
+      expires_at TIMESTAMPTZ NOT NULL,
+      used BOOLEAN NOT NULL DEFAULT false,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_otp_codes_email ON otp_codes(email);`,
   ];
   for (const sql of statements) {
     try {

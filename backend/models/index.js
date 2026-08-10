@@ -8,6 +8,7 @@ const PasswordReset = require('./PasswordReset');
 const ApiKey = require('./ApiKey');
 const EmailConfig = require('./EmailConfig');
 const MfaFactor = require('./MfaFactor');
+const OtpCode = require('./OtpCode');
 const DoctorCredential = require('./DoctorCredential');
 const Organization = require('./Organization');
 const Doctor = require('./Doctor');
@@ -218,6 +219,7 @@ module.exports = {
   ApiKey,
   EmailConfig,
   MfaFactor,
+  OtpCode,
   DoctorCredential,
   Organization,
   Doctor,

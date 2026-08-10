@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
-const { User, Session, PasswordReset } = require('../models');
-const { sendPasswordResetEmail, isFeatureEnabled } = require('../lib/emailService');
+const { User, Session, PasswordReset, OtpCode } = require('../models');
+const { sendPasswordResetEmail, sendSignupOtpEmail, isFeatureEnabled } = require('../lib/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -380,6 +380,103 @@ router.post('/verify-reset-token', async (req, res) => {
     res.json({ valid: true });
   } catch (error) {
     console.error('Verify reset token error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---- OTP (One-Time Password) endpoints ----
+// Used for signup email verification when enable_signup_otp is on.
+
+// POST /api/auth/request-otp
+// Generates a 6-digit OTP, stores it with 10-minute expiry, and emails it.
+router.post('/request-otp', async (req, res) => {
+  try {
+    const { email, purpose = 'signup' } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if signup OTP is enabled
+    const otpEnabled = await isFeatureEnabled('enable_signup_otp');
+    if (!otpEnabled) {
+      return res.status(400).json({ error: 'OTP verification is not enabled' });
+    }
+
+    // Rate limit: max 3 OTP requests per email per 10 minutes
+    const recentOtps = await OtpCode.count({
+      where: {
+        email,
+        created_at: { [require('sequelize').Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+    });
+    if (recentOtps >= 3) {
+      return res.status(429).json({ error: 'Too many OTP requests. Please wait 10 minutes.' });
+    }
+
+    // Invalidate any previous unused OTPs for this email
+    await OtpCode.update(
+      { used: true },
+      { where: { email, used: false } }
+    );
+
+    // Generate 6-digit code
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await OtpCode.create({ email, code, purpose, expires_at: expiresAt });
+
+    // Send the OTP email
+    const result = await sendSignupOtpEmail(email, code);
+    if (!result.success) {
+      return res.status(500).json({
+        error: `Could not send OTP email: ${result.error}`,
+        otp_sent: false,
+      });
+    }
+
+    res.json({ success: true, message: 'OTP sent to your email', otp_sent: true });
+  } catch (error) {
+    console.error('Request OTP error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/auth/verify-otp
+// Validates the OTP code against the stored record.
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, code, purpose = 'signup' } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and code are required' });
+    }
+
+    const otpRecord = await OtpCode.findOne({
+      where: { email, code, used: false, purpose },
+      order: [['created_at', 'DESC']],
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Invalid OTP code' });
+    }
+
+    // Check expiry
+    if (new Date(otpRecord.expires_at) < new Date()) {
+      await otpRecord.update({ used: true });
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Check max attempts (5)
+    if (otpRecord.attempts >= 5) {
+      await otpRecord.update({ used: true });
+      return res.status(400).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
+    }
+
+    // Mark as used
+    await otpRecord.update({ used: true });
+
+    res.json({ success: true, message: 'OTP verified successfully' });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
     res.status(500).json({ error: error.message });
   }
 });
