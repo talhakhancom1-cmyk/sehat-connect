@@ -10,15 +10,18 @@ import { plansFromPrescription } from '@/lib/medication';
 import { generatePrescriptionPdf } from '@/lib/prescriptionPdf';
 import { formatAppointmentDate } from '@/lib/utils';
 import { Plus, FileText, ShieldCheck, Pill, Download, FileSignature, X } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function DoctorPrescriptions() {
   const { doctor, isVerified, loading: docLoading } = useDoctorProfile();
+  const { toast } = useToast();
   const [prescriptions, setPrescriptions] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [generatingPlans, setGeneratingPlans] = useState(null);
 
   useEffect(() => {
     if (doctor?.id) load();
@@ -64,11 +67,24 @@ export default function DoctorPrescriptions() {
   };
 
   const generatePlans = async (presc) => {
-    const plans = plansFromPrescription(presc, doctor);
-    if (!plans.length) return;
-    await base44.entities.MedicationPlan.bulkCreate(plans);
-    await Promise.all(plans.map(p => recordAudit({ action: 'medication_plan_create', target_type: 'MedicationPlan', target_id: p.id || presc.id, patient_id: presc.patient_id, detail: `Plan for ${p.medication_name}` })));
-    load();
+    if (generatingPlans) return;
+    setGeneratingPlans(presc.id);
+    try {
+      const plans = plansFromPrescription(presc, doctor);
+      if (!plans.length) {
+        toast({ title: 'No medications', description: 'This prescription has no medications to create plans for.' });
+        return;
+      }
+      await base44.entities.MedicationPlan.bulkCreate(plans);
+      await Promise.all(plans.map(p => recordAudit({ action: 'medication_plan_create', target_type: 'MedicationPlan', target_id: p.id || presc.id, patient_id: presc.patient_id, detail: `Plan for ${p.medication_name}` })));
+      toast({ title: 'Plans created', description: `${plans.length} medication plan${plans.length > 1 ? 's' : ''} created from this prescription.` });
+      load();
+    } catch (err) {
+      console.error('Generate plans failed:', err);
+      toast({ title: 'Could not create plans', description: err?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setGeneratingPlans(null);
+    }
   };
 
   return (
@@ -116,7 +132,14 @@ export default function DoctorPrescriptions() {
                     <button onClick={() => signPrescription(presc)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-all ml-auto"><ShieldCheck className="w-3.5 h-3.5" /> Sign</button>
                   )}
                   {presc.is_signed && (
-                    <button onClick={() => generatePlans(presc)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-all ml-auto"><Plus className="w-3.5 h-3.5" /> Plans</button>
+                    <button
+                      onClick={() => generatePlans(presc)}
+                      disabled={generatingPlans === presc.id}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-all ml-auto disabled:opacity-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {generatingPlans === presc.id ? 'Creating…' : 'Plans'}
+                    </button>
                   )}
                 </div>
               </div>

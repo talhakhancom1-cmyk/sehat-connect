@@ -223,7 +223,7 @@ const integrations = {
       const fullUrl = data.download_token
         ? `${baseUrl}${data.file_url}?token=${data.download_token}`
         : `${baseUrl}${data.file_url}`;
-      return { file_url: fullUrl, ...data };
+      return { ...data, file_url: fullUrl };
     },
     ExtractDataFromUploadedFile: () => {
       console.warn('ExtractDataFromUploadedFile is a stub in the local backend');

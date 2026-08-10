@@ -205,12 +205,26 @@ export default function ChatThread() {
   };
 
   const handleStartCall = async () => {
-    if (!conversation || !user?.id || !other?.id) return;
+    if (!conversation || !user?.id) {
+      console.warn('Call: conversation or user not ready');
+      return;
+    }
+    if (!other?.id) {
+      console.warn('Call: other party id is missing', { conversation, other });
+      alert('Could not start call: the other party is not identified in this conversation.');
+      return;
+    }
     if (initiatingCallRef.current || showCall) return;
     initiatingCallRef.current = true;
     setIncomingCall(null);
     try {
       const socket = getCallSocket();
+      if (!socket) {
+        console.error('Call: socket not connected');
+        alert('Could not start call: real-time connection is not available. Please refresh and try again.');
+        initiatingCallRef.current = false;
+        return;
+      }
       const res = await initiateCall(socket, {
         to_user_id: other.id,
         call_type: 'audio',
@@ -226,7 +240,8 @@ export default function ChatThread() {
         data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id },
       }).catch(() => {});
     } catch (e) {
-      console.error(e);
+      console.error('Call failed:', e);
+      alert('Could not start call: ' + (e?.message || 'Unknown error'));
       initiatingCallRef.current = false;
     }
   };
