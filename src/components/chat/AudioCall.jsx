@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, PhoneOff, Mic, MicOff } from 'lucide-react';
 import { useWebRTCCall } from '@/lib/useWebRTCCall';
 
@@ -23,14 +23,43 @@ export function buildCallRoomName(conversationId) {
 export default function AudioCall({ callId, role, remoteUserId, _displayName, otherName, onClose }) {
   const [seconds, setSeconds] = useState(0);
   const [waiting, setWaiting] = useState(0);
+  const remoteAudioRef = useRef(null);
 
-  const { status, error, muted, toggleMute, endCall } = useWebRTCCall({
+  const { status, error, muted, toggleMute, endCall, remoteStream } = useWebRTCCall({
     callId,
     role,
     remoteUserId,
     video: false,
     onEnded: onClose,
   });
+
+  // Attach the remote audio stream to the <audio> element and play it.
+  // Browsers block autoplay with sound unless there was a user gesture;
+  // since the user clicked "Accept", we can call .play() explicitly.
+  useEffect(() => {
+    const el = remoteAudioRef.current;
+    if (!el || !remoteStream) return;
+    el.srcObject = remoteStream;
+    // Log track info for debugging
+    const audioTracks = remoteStream.getAudioTracks();
+    console.log('[AudioCall] remoteStream attached', {
+      hasAudio: audioTracks.length > 0,
+      audioTracks: audioTracks.map((t) => ({ id: t.id, kind: t.kind, enabled: t.enabled, muted: t.muted, readyState: t.readyState })),
+    });
+    el.play().then(() => {
+      console.log('[AudioCall] remote audio playing');
+    }).catch((err) => {
+      console.warn('[AudioCall] remote audio play() rejected:', err.message);
+      // Retry on next user interaction
+      const resume = () => {
+        el.play().catch(() => {});
+        document.removeEventListener('click', resume);
+        document.removeEventListener('touchstart', resume);
+      };
+      document.addEventListener('click', resume, { once: true });
+      document.addEventListener('touchstart', resume, { once: true });
+    });
+  }, [remoteStream]);
 
   // Call timer — starts when connected.
   useEffect(() => {
@@ -79,6 +108,9 @@ export default function AudioCall({ callId, role, remoteUserId, _displayName, ot
 
   return (
     <div className="fixed inset-0 z-[55] bg-slate-900 flex flex-col items-center justify-center">
+      {/* Hidden audio element that plays the remote peer's audio stream */}
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+
       <div className="absolute top-0 left-0 right-0 p-4 flex justify-between">
         <div className="flex items-center gap-2 text-white">
           <div className={'w-2.5 h-2.5 rounded-full ' + statusColor} />

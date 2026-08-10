@@ -16,7 +16,7 @@
  */
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
-const { CallRoom, CallParticipant } = require('../models');
+const { CallRoom, CallParticipant, User } = require('../models');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -196,6 +196,15 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         if (!callMembers.has(room.id)) callMembers.set(room.id, new Set());
         callMembers.get(room.id).add(userId);
 
+        // Fetch caller's display info to send with the ringing event.
+        const caller = await User.findByPk(userId, {
+          attributes: ['id', 'first_name', 'last_name', 'profile_image_url'],
+        });
+        const callerName = caller
+          ? `${caller.first_name || ''} ${caller.last_name || ''}`.trim() || 'Unknown'
+          : 'Unknown';
+        const callerImageUrl = caller?.profile_image_url || null;
+
         // Ring the target user (only if they have sockets online).
         const targetSockets = getSocketIdsForUser(to_user_id);
         console.log(`[realtime] target ${to_user_id} has ${targetSockets.length} socket(s) online`);
@@ -206,6 +215,8 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
             call_type: room.call_type,
             conversation_id,
             appointment_id,
+            caller_name: callerName,
+            caller_image_url: callerImageUrl,
           });
         });
 
@@ -421,10 +432,21 @@ function buildBroadcasters(io) {
     /**
      * Ring a specific user (incoming call notification).
      */
-    emitCallRinging(callId, fromUserId, toUserId) {
+    async emitCallRinging(callId, fromUserId, toUserId) {
+      const caller = await User.findByPk(fromUserId, {
+        attributes: ['id', 'first_name', 'last_name', 'profile_image_url'],
+      });
+      const callerName = caller
+        ? `${caller.first_name || ''} ${caller.last_name || ''}`.trim() || 'Unknown'
+        : 'Unknown';
       const targetSockets = getSocketIdsForUser(toUserId);
       targetSockets.forEach((sid) => {
-        io.to(sid).emit('call:ringing', { call_id: callId, from_user_id: fromUserId });
+        io.to(sid).emit('call:ringing', {
+          call_id: callId,
+          from_user_id: fromUserId,
+          caller_name: callerName,
+          caller_image_url: caller?.profile_image_url || null,
+        });
       });
     },
     /**

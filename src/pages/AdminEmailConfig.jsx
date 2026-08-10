@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,6 +84,13 @@ export default function AdminEmailConfig() {
     is_active: true,
   });
 
+  // Ref to always have the latest form state in callbacks (avoids stale closures).
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
+  // Guard to prevent load() from running more than once on mount.
+  const loadedRef = useRef(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -119,7 +126,11 @@ export default function AdminEmailConfig() {
     }
   }, [toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    load();
+  }, [load]);
 
   const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -135,19 +146,33 @@ export default function AdminEmailConfig() {
   };
 
   const save = async () => {
-    if (!form.smtp_host || !form.smtp_username || !form.from_email) {
+    // Read from ref to avoid any stale closure issues.
+    const f = formRef.current;
+    console.log('[SMTP] save called, form state:', {
+      smtp_host: f.smtp_host,
+      smtp_username: f.smtp_username,
+      from_email: f.from_email,
+      smtp_password: f.smtp_password ? '(set)' : '(empty)',
+      smtp_port: f.smtp_port,
+    });
+    const host = (f.smtp_host || '').trim();
+    const username = (f.smtp_username || '').trim();
+    const fromEmail = (f.from_email || '').trim();
+    if (!host || !username || !fromEmail) {
+      console.error('[SMTP] validation failed:', { host: !!host, username: !!username, fromEmail: !!fromEmail });
       toast({ title: 'Missing fields', description: 'SMTP host, username, and from email are required', variant: 'destructive' });
       return;
     }
-    if (!config && !form.smtp_password) {
+    if (!config && !f.smtp_password) {
       toast({ title: 'Password required', description: 'SMTP password is required on first setup', variant: 'destructive' });
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...form };
+      const payload = { ...f, smtp_host: host, smtp_username: username, from_email: fromEmail };
       // Don't send empty password on update
       if (config && !payload.smtp_password) delete payload.smtp_password;
+      console.log('[SMTP] sending payload to backend:', { ...payload, smtp_password: payload.smtp_password ? '(set)' : '(omitted)' });
       await apiRequest('/email-config', { method: 'POST', body: payload });
       toast({ title: 'Email settings saved' });
       await load();

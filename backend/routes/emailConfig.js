@@ -41,9 +41,20 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const body = req.body || {};
+    console.log('[email-config] POST received, body keys:', Object.keys(body), {
+      smtp_host: body.smtp_host,
+      smtp_username: body.smtp_username,
+      from_email: body.from_email,
+      has_password: !!body.smtp_password,
+    });
 
     // Validate required fields
     if (!body.smtp_host || !body.smtp_username || !body.from_email) {
+      console.error('[email-config] validation failed:', {
+        smtp_host: !!body.smtp_host,
+        smtp_username: !!body.smtp_username,
+        from_email: !!body.from_email,
+      });
       return res.status(400).json({
         error: 'smtp_host, smtp_username, and from_email are required',
       });

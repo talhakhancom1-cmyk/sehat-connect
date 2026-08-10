@@ -1,0 +1,27 @@
+Fix call audio playback, caller ID, and SMTP save bug
+
+Bug 1 - Call audio not working:
+- AudioCall: add hidden audio element to play remote stream
+  (was completely missing - no audio element existed at all)
+- VideoCall: explicitly call .play() on remote video to bypass
+  autoplay policy, with fallback to resume on user interaction
+- Add debug logging for local/remote track details
+
+Bug 1b - Caller name/photo missing on incoming calls:
+- Backend: include caller_name and caller_image_url in call:ringing
+  event by fetching User record before emitting
+- Frontend CallContext: use caller_name/caller_image_url from event
+  instead of hardcoded 'Incoming call'
+- GlobalCallOverlay: pass callerImageUrl to IncomingCallOverlay
+- CallContext acceptCall: pass callerName as otherName to activeCall
+
+Bug 2 - SMTP settings save fails with Missing fields:
+- Add formRef to ensure save() always reads latest form state
+  (guards against potential stale closure issues)
+- Add loadedRef to prevent load() from running more than once
+- Trim field values before validation
+- Add debug logging to frontend save() and backend POST handler
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

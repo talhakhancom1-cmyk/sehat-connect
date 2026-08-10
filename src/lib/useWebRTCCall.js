@@ -205,7 +205,14 @@ export function useWebRTCCall({ callId, remoteUserId, role, video = false, onEnd
         const stream = await call.start({ video });
         if (disposed) { call.close(); return; }
         setLocalStream(stream);
-        console.log('[WebRTC] local media acquired');
+        const audioTracks = stream.getAudioTracks();
+        const videoTracks = stream.getVideoTracks();
+        console.log('[WebRTC] local media acquired', {
+          audioTracks: audioTracks.length,
+          videoTracks: videoTracks.length,
+          audioDetail: audioTracks.map((t) => ({ id: t.id, kind: t.kind, enabled: t.enabled, readyState: t.readyState, label: t.label })),
+          videoDetail: videoTracks.map((t) => ({ id: t.id, kind: t.kind, enabled: t.enabled, readyState: t.readyState, label: t.label })),
+        });
       } catch (e) {
         if (!disposed) {
           setError(e.message || 'Could not access microphone/camera');

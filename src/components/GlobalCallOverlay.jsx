@@ -35,6 +35,7 @@ export default function GlobalCallOverlay() {
     return (
       <IncomingCallOverlay
         callerName={incomingCall.callerName}
+        callerImageUrl={incomingCall.callerImageUrl}
         callType={incomingCall.call_type}
         onAccept={acceptCall}
         onDecline={declineCall}

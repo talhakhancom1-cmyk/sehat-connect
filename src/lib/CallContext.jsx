@@ -39,8 +39,8 @@ export function CallProvider({ children }) {
     const socket = getCallSocket();
     if (!socket) return;
 
-    const onRinging = ({ call_id, from_user_id, call_type, conversation_id, appointment_id }) => {
-      console.log('[CallContext] call:ringing received', { call_id, from_user_id, call_type, conversation_id });
+    const onRinging = ({ call_id, from_user_id, call_type, conversation_id, appointment_id, caller_name, caller_image_url }) => {
+      console.log('[CallContext] call:ringing received', { call_id, from_user_id, call_type, conversation_id, caller_name });
       // Skip if we're already in a call or already showing an incoming call.
       if (activeCallRef.current || incomingCallRef.current || initiatingRef.current) {
         console.log('[CallContext] auto-declining (busy)');
@@ -50,7 +50,8 @@ export function CallProvider({ children }) {
       }
       setIncomingCall({
         callId: call_id,
-        callerName: 'Incoming call',
+        callerName: caller_name || 'Unknown',
+        callerImageUrl: caller_image_url || null,
         call_type: call_type || 'audio',
         remoteUserId: from_user_id,
         conversation_id,
@@ -163,6 +164,7 @@ export function CallProvider({ children }) {
         video: incoming.call_type === 'video',
         conversationId: incoming.conversation_id,
         callType: incoming.call_type || 'audio',
+        otherName: incoming.callerName || 'Caller',
         startedAt: Date.now(),
       });
       setIncomingCall(null);

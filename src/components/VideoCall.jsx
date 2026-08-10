@@ -36,9 +36,33 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
   }, [localStream]);
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
+    const el = remoteVideoRef.current;
+    if (!el || !remoteStream) return;
+    el.srcObject = remoteStream;
+    // Log track info for debugging audio issues
+    const audioTracks = remoteStream.getAudioTracks();
+    const videoTracks = remoteStream.getVideoTracks();
+    console.log('[VideoCall] remoteStream attached', {
+      hasAudio: audioTracks.length > 0,
+      hasVideo: videoTracks.length > 0,
+      audioTracks: audioTracks.map((t) => ({ id: t.id, enabled: t.enabled, muted: t.muted, readyState: t.readyState })),
+    });
+    // Explicitly call play() — browsers block autoplay with sound unless
+    // there was a user gesture. Since the user clicked "Accept"/"Call",
+    // we have a gesture, but we still need to call play() to be safe.
+    el.play().then(() => {
+      console.log('[VideoCall] remote video+audio playing');
+    }).catch((err) => {
+      console.warn('[VideoCall] remote play() rejected:', err.message);
+      // Retry on next user interaction
+      const resume = () => {
+        el.play().catch(() => {});
+        document.removeEventListener('click', resume);
+        document.removeEventListener('touchstart', resume);
+      };
+      document.addEventListener('click', resume, { once: true });
+      document.addEventListener('touchstart', resume, { once: true });
+    });
   }, [remoteStream]);
 
   // Call timer — starts when connected.
