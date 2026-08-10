@@ -39,6 +39,7 @@ export default function DoctorPatients() {
     if (!patientMap.has(a.patient_name)) {
       patientMap.set(a.patient_name, {
         name: a.patient_name,
+        patient_id: a.patient_id,
         age: a.patient_age || 30,
         gender: a.patient_gender || 'male',
         visits: 1,
@@ -123,7 +124,7 @@ export default function DoctorPatients() {
 
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
                     <button
-                      onClick={() => setSelectedPatient(patient.name)}
+                      onClick={() => setSelectedPatient({ name: patient.name, id: patient.patient_id })}
                       disabled={!access.hasAccess}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                         access.hasAccess
@@ -153,7 +154,8 @@ export default function DoctorPatients() {
       {/* Patient Records Dialog */}
       {selectedPatient && (
         <PatientOverviewDialog
-          patientName={selectedPatient}
+          patientName={selectedPatient.name}
+          patientId={selectedPatient.id}
           doctorId={doctorEntityId}
           appointments={appointments}
           open={!!selectedPatient}

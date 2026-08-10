@@ -40,7 +40,7 @@ export default function ChatThread() {
   // Refs mirror the call state so the message-subscription callback (which captures
   // values at effect-setup time) always reads the current values.
   const showCallRef = useRef(false);
-  const incomingCallRef = useRef(null);https://www.youtube.com/watch?v=saOHY9ZHyiI&list=RDsaOHY9ZHyiI&start_radio=1&pp=oAcB
+  const incomingCallRef = useRef(null);
   useEffect(() => { showCallRef.current = showCall; }, [showCall]);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
 
@@ -116,6 +116,9 @@ export default function ChatThread() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const other = otherParty(conversation, user?.id);
+  const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
   // --- Listen for incoming call invitations via the WebSocket signaling server ---
   useEffect(() => {
@@ -200,9 +203,6 @@ export default function ChatThread() {
       setSending(false);
     }
   };
-
-  const other = otherParty(conversation, user?.id);
-  const otherImageUrl = other?.role === 'doctor' ? conversation?.doctor_image : conversation?.patient_image;
 
   const handleStartCall = async () => {
     if (!conversation || !user?.id || !other?.id) return;

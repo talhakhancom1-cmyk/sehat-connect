@@ -29,7 +29,7 @@ const tabs = [
   { key: 'visits', label: 'Visit History', icon: CalendarDays },
 ];
 
-export default function PatientOverviewDialog({ patientName, doctorId, appointments = [], open, onClose }) {
+export default function PatientOverviewDialog({ patientName, patientId, doctorId, appointments = [], open, onClose }) {
   const [access, setAccess] = useState(null);
   const [records, setRecords] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
@@ -40,7 +40,7 @@ export default function PatientOverviewDialog({ patientName, doctorId, appointme
   useEffect(() => {
     if (!open || !patientName || !doctorId) return;
     loadData();
-  }, [open, patientName, doctorId]);
+  }, [open, patientName, patientId, doctorId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -52,8 +52,11 @@ export default function PatientOverviewDialog({ patientName, doctorId, appointme
       setAccess(accessResult);
 
       if (accessResult.hasAccess) {
+        // Query by patient_id when available (robust against name mismatches),
+        // falling back to patient_name for legacy records.
+        const recordFilter = patientId ? { patient_id: patientId } : { patient_name: patientName };
         const [recs, prescs, appts] = await Promise.all([
-          base44.entities.MedicalRecord.filter({ patient_name: patientName }, '-date', 50),
+          base44.entities.MedicalRecord.filter(recordFilter, '-date', 50),
           base44.entities.Prescription.filter({ patient_name: patientName }, '-date', 50),
           base44.entities.Appointment.filter({ patient_name: patientName }, '-appointment_date', 50),
         ]);

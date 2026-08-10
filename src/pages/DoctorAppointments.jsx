@@ -117,7 +117,7 @@ export default function DoctorAppointments() {
                 />
                 {['confirmed', 'completed', 'in_progress'].includes(appt.status) && (
                   <button
-                    onClick={() => setSelectedPatient(appt.patient_name)}
+                    onClick={() => setSelectedPatient({ name: appt.patient_name, id: appt.patient_id })}
                     className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary/5 text-primary text-xs font-semibold hover:bg-primary/10 transition-all active:scale-95"
                   >
                     <ClipboardList className="w-3.5 h-3.5" />
@@ -147,7 +147,8 @@ export default function DoctorAppointments() {
 
       {selectedPatient && (
         <PatientOverviewDialog
-          patientName={selectedPatient}
+          patientName={selectedPatient.name}
+          patientId={selectedPatient.id}
           doctorId={doctorEntityId}
           appointments={appointments}
           open={!!selectedPatient}

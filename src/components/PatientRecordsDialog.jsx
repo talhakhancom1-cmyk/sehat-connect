@@ -18,7 +18,7 @@ const categoryColors = {
   'Discharge Summary': 'text-teal-600 bg-teal-100',
 };
 
-export default function PatientRecordsDialog({ patientName, doctorId, open, onClose }) {
+export default function PatientRecordsDialog({ patientName, patientId, doctorId, open, onClose }) {
   const [access, setAccess] = useState(null);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function PatientRecordsDialog({ patientName, doctorId, open, onCl
   useEffect(() => {
     if (!open || !patientName || !doctorId) return;
     loadData();
-  }, [open, patientName, doctorId]);
+  }, [open, patientName, patientId, doctorId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -36,7 +36,10 @@ export default function PatientRecordsDialog({ patientName, doctorId, open, onCl
       setAccess(accessResult);
 
       if (accessResult.hasAccess) {
-        const recs = await base44.entities.MedicalRecord.filter({ patient_name: patientName }, '-date', 50);
+        // Query by patient_id when available (robust against name mismatches),
+        // falling back to patient_name for legacy records.
+        const recordFilter = patientId ? { patient_id: patientId } : { patient_name: patientName };
+        const recs = await base44.entities.MedicalRecord.filter(recordFilter, '-date', 50);
         // When access is via consent, enforce category scoping
         const consentCategories = accessResult.accessReason === 'consent' ? accessResult.consent?.categories : null;
         const scoped = consentCategories?.length

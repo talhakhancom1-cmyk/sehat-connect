@@ -74,7 +74,7 @@ export default function MedicalRecords() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.entities.MedicalRecord.create({
-        patient_name: user?.full_name || user?.display_name || 'Patient',
+        patient_name: user?.display_name || user?.full_name || user?.email || 'Patient',
         title: file.name.replace(/\.[^/.]+$/, ''),
         category: pickCategory,
         date: new Date().toISOString().split('T')[0],
