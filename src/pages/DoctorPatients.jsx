@@ -5,6 +5,7 @@ import Layout from '@/components/Layout';
 import StatusBadge from '@/components/StatusBadge';
 import PatientOverviewDialog from '@/components/PatientOverviewDialog';
 import { batchCheckAccess } from '@/lib/recordAccess';
+import { formatAppointmentDate } from '@/lib/utils';
 import { Users, Search, FileText, ShieldCheck, Clock, Lock } from 'lucide-react';
 
 export default function DoctorPatients() {
@@ -134,7 +135,7 @@ export default function DoctorPatients() {
                       View Records
                     </button>
                     <span className="ml-auto text-[10px] text-muted-foreground">
-                      Last: {patient.lastVisit}
+                      Last: {formatAppointmentDate(patient.lastVisit)}
                     </span>
                   </div>
                 </div>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { checkRecordAccess, daysUntilExpiry } from '@/lib/recordAccess';
+import { formatAppointmentDate } from '@/lib/utils';
+import { formatRecordDate } from '@/lib/recordDate';
 import {
   X, FileText, Lock, ShieldCheck, Clock, FileImage, Pill, CalendarDays,
   Stethoscope, Activity, User, ChevronRight
@@ -119,7 +121,7 @@ export default function PatientOverviewDialog({ patientName, doctorId, appointme
               <div className="px-5 pt-3 shrink-0">
                 <div className="flex items-center gap-2 p-2.5 rounded-xl bg-green-50 text-green-700 text-xs font-medium border border-green-200">
                   <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>Record access active — expires in {daysUntilExpiry(access.activeAppointment?.appointment_date)} days</span>
+                  <span>Record access active{daysUntilExpiry(access.activeAppointment?.appointment_date) != null ? ` — expires in ${daysUntilExpiry(access.activeAppointment?.appointment_date)} days` : ''}</span>
                 </div>
               </div>
 
@@ -200,7 +202,7 @@ function OverviewTab({ patientName, patientAge, patientGender, records, prescrip
     { label: 'Total Visits', value: appointments.length, icon: CalendarDays, color: 'text-blue-600 bg-blue-100' },
     { label: 'Records', value: records.length, icon: FileText, color: 'text-rose-600 bg-rose-100' },
     { label: 'Prescriptions', value: prescriptions.length, icon: Pill, color: 'text-indigo-600 bg-indigo-100' },
-    { label: 'Last Visit', value: appointments[0]?.appointment_date || '—', icon: Activity, color: 'text-teal-600 bg-teal-100' },
+    { label: 'Last Visit', value: formatAppointmentDate(appointments[0]?.appointment_date), icon: Activity, color: 'text-teal-600 bg-teal-100' },
   ];
 
   const recentRecords = records.slice(0, 3);
@@ -244,7 +246,7 @@ function OverviewTab({ patientName, patientAge, patientGender, records, prescrip
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{p.diagnosis || 'Prescription'}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {p.medications?.length || 0} meds · {p.date}
+                    {p.medications?.length || 0} meds · {formatAppointmentDate(p.date)}
                   </p>
                 </div>
                 <span className={cn(
@@ -285,7 +287,7 @@ function OverviewTab({ patientName, patientAge, patientGender, records, prescrip
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{rec.title}</p>
-                    <p className="text-[11px] text-muted-foreground">{rec.category} · {rec.date}</p>
+                    <p className="text-[11px] text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
                   </div>
                   {rec.file_url && (
                     <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline shrink-0">
@@ -327,7 +329,7 @@ function RecordsTab({ records }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{rec.title}</p>
-              <p className="text-xs text-muted-foreground">{rec.category} · {rec.date}</p>
+              <p className="text-xs text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
               {rec.doctor_name && <p className="text-[10px] text-muted-foreground mt-0.5">Dr. {rec.doctor_name}</p>}
               {rec.hospital && <p className="text-[10px] text-muted-foreground">{rec.hospital}</p>}
             </div>
@@ -362,7 +364,7 @@ function PrescriptionsTab({ prescriptions }) {
               <Stethoscope className="w-4 h-4 text-primary" />
               <div>
                 <p className="text-sm font-semibold">{p.diagnosis || 'Prescription'}</p>
-                <p className="text-[10px] text-muted-foreground">Dr. {p.doctor_name} · {p.date}</p>
+                <p className="text-[10px] text-muted-foreground">Dr. {p.doctor_name} · {formatAppointmentDate(p.date)}</p>
               </div>
             </div>
             <span className={cn(
@@ -440,7 +442,7 @@ function VisitsTab({ appointments }) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold capitalize">{a.type} consultation</p>
             <p className="text-[11px] text-muted-foreground">
-              {a.appointment_date} · {a.time_slot}
+              {formatAppointmentDate(a.appointment_date)} · {a.time_slot}
             </p>
             {a.reason && <p className="text-[10px] text-muted-foreground truncate mt-0.5">{a.reason}</p>}
           </div>

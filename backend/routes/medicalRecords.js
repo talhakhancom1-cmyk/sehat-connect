@@ -1,6 +1,8 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const router = express.Router();
 const MedicalRecord = require('../models/MedicalRecord');
+const Doctor = require('../models/Doctor');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
@@ -21,15 +23,45 @@ function isAdmin(user) {
   return ADMIN_ROLES.includes(user.role);
 }
 
-// Get medical records — scoped to the owning patient, admins see all.
-// created_by_id isn't a real column on this model (frontend sends it as a legacy filter
-// that never mapped to anything); it's ignored here in favor of the real patient_id scope.
+function isDoctor(user) {
+  return user.role === 'doctor';
+}
+
+// Get medical records.
+// - Admins: can see all records, optionally filtered by patient_id/patient_name.
+// - Doctors: can query by patient_id or patient_name (the frontend's
+//   PatientRecordsDialog/PatientOverviewDialog sends patient_name after
+//   verifying record access via checkRecordAccess). Without this, doctors
+//   would only see records where patient_id = their own user ID (zero).
+// - Patients: only see their own records (patient_id = their user ID).
 router.get('/', authenticate, async (req, res) => {
   try {
-    const where = isAdmin(req.user) ? {} : { patient_id: req.user.id };
-    if (isAdmin(req.user) && req.query.patient_id) where.patient_id = req.query.patient_id;
-    if (req.query.category) where.category = req.query.category;
-    if (req.query.provenance) where.provenance = req.query.provenance;
+    const andConditions = [];
+
+    if (isAdmin(req.user)) {
+      // Admins see everything; apply optional filters
+      if (req.query.patient_id) andConditions.push({ patient_id: req.query.patient_id });
+      if (req.query.patient_name) andConditions.push({ patient_name: req.query.patient_name });
+    } else if (isDoctor(req.user)) {
+      // Doctors can query by patient_id or patient_name (access control is
+      // enforced on the frontend via checkRecordAccess before querying).
+      if (req.query.patient_id) {
+        andConditions.push({ patient_id: req.query.patient_id });
+      } else if (req.query.patient_name) {
+        andConditions.push({ patient_name: req.query.patient_name });
+      } else {
+        // No patient filter — return nothing (doctors shouldn't see all records)
+        andConditions.push({ patient_id: '__NO_MATCH__' });
+      }
+    } else {
+      // Patients see only their own records
+      andConditions.push({ patient_id: req.user.id });
+    }
+
+    if (req.query.category) andConditions.push({ category: req.query.category });
+    if (req.query.provenance) andConditions.push({ provenance: req.query.provenance });
+
+    const where = andConditions.length ? { [Op.and]: andConditions } : {};
     const { offset, limit } = paginate(req);
     const { rows, count } = await MedicalRecord.findAndCountAll({
       where,
@@ -44,14 +76,14 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Get medical record by ID — owner or admin
+// Get medical record by ID — owner, doctor, or admin
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const record = await MedicalRecord.findByPk(req.params.id);
     if (!record) {
       return res.status(404).json({ error: 'Medical record not found' });
     }
-    if (!isAdmin(req.user) && record.patient_id !== req.user.id) {
+    if (!isAdmin(req.user) && record.patient_id !== req.user.id && !isDoctor(req.user)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     res.json(record);

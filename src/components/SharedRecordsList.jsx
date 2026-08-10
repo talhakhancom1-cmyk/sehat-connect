@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { getIncomingSharedData } from '@/lib/familyAccess';
 import EmptyState from '@/components/EmptyState';
 import { cn } from '@/lib/utils';
+import { formatRecordDate } from '@/lib/recordDate';
 
 const categoryColors = {
   'Blood Report': 'text-rose-600 bg-rose-50',
@@ -73,7 +74,7 @@ export default function SharedRecordsList() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{rec.title}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    From {rec._delegatorName} · {rec.date}
+                    From {rec._delegatorName} · {formatRecordDate(rec)}
                   </p>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import FamilyAuthorizations from '@/components/FamilyAuthorizations';
 import SharedRecordsList from '@/components/SharedRecordsList';
 import { Heart, Activity, Droplets, Plus, ChevronRight, FileText, Search, FileImage, Scale, UploadCloud, CalendarClock, Share2, X, Loader2 } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
+import { formatRecordDate } from '@/lib/recordDate';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -48,7 +49,7 @@ export default function MedicalRecords() {
 
   const load = async () => {
     try {
-      const data = await base44.entities.MedicalRecord.filter({ created_by_id: user.id }, '-date', 100);
+      const data = await base44.entities.MedicalRecord.filter({ patient_id: user.id }, '-date', 100);
       setRecords(data);
     } catch { setRecords([]); }
     finally { setLoading(false); }
@@ -189,7 +190,7 @@ export default function MedicalRecords() {
                       <DoctorAvatar name={rec.doctor_name || rec.patient_name} size="md" round />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm">{rec.doctor_name || rec.title}</p>
-                        <p className="text-xs text-muted-foreground">{rec.category} · {rec.date}</p>
+                        <p className="text-xs text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -268,7 +269,7 @@ export default function MedicalRecords() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate">{rec.title}</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{rec.date}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{formatRecordDate(rec)}</p>
                           </div>
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">

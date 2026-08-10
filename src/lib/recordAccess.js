@@ -19,8 +19,9 @@ export function isAccessExpired(appointmentDate) {
  * Returns 0 if already expired.
  */
 export function daysUntilExpiry(appointmentDate) {
-  if (!appointmentDate) return 0;
+  if (!appointmentDate) return null;  // null = no expiry date available
   const apptDate = new Date(appointmentDate);
+  if (isNaN(apptDate.getTime())) return null;  // invalid date string
   const now = new Date();
   const elapsed = now.getTime() - apptDate.getTime();
   const remaining = ACCESS_WINDOW_MS - elapsed;

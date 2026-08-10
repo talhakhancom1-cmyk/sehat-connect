@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { recordAudit } from '@/lib/audit';
 import { transitionAllowed } from '@/lib/appointmentStateMachine';
 import { X, Stethoscope } from 'lucide-react';
+import { formatAppointmentDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -80,7 +81,7 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
             <Stethoscope className="w-5 h-5 text-primary" />
             <div>
               <h3 className="font-bold">Clinical encounter</h3>
-              <p className="text-[11px] text-muted-foreground">{appointment.patient_name} · {appointment.appointment_date} {appointment.time_slot}</p>
+              <p className="text-[11px] text-muted-foreground">{appointment.patient_name} · {formatAppointmentDate(appointment.appointment_date)} {appointment.time_slot}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-secondary"><X className="w-5 h-5 text-muted-foreground" /></button>

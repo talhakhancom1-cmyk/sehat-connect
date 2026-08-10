@@ -25,7 +25,7 @@ export default function ConsultationHistory() {
     try {
       const [appts, prescs, encs] = await Promise.all([
         base44.entities.Appointment.filter({ patient_id: user.id }, '-appointment_date', 100),
-        base44.entities.Prescription.filter({ patient_name: user?.full_name }, '-date', 50),
+        base44.entities.Prescription.filter({ patient_id: user.id }, '-date', 50),
         base44.entities.Encounter.filter({ patient_id: user.id }, '-encounter_date', 100),
       ]);
       setAppointments(appts);

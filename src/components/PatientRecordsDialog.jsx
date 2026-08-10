@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { checkRecordAccess, daysUntilExpiry } from '@/lib/recordAccess';
 import { FileText, Lock, ShieldCheck, Clock, X, FileImage } from 'lucide-react';
-import { cn, authFileUrl } from '@/lib/utils';
+import { cn, authFileUrl, formatAppointmentDate } from '@/lib/utils';
+import { formatRecordDate } from '@/lib/recordDate';
 
 const categoryColors = {
   'Blood Report': 'text-rose-600 bg-rose-100',
@@ -101,7 +102,7 @@ export default function PatientRecordsDialog({ patientName, doctorId, open, onCl
                     {access.consent.expires_at ? ` · expires ${new Date(access.consent.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' · no expiry'}
                   </span>
                 ) : (
-                  <span>Record access active — expires in {daysUntilExpiry(access.activeAppointment?.appointment_date)} days</span>
+                  <span>Record access active{daysUntilExpiry(access.activeAppointment?.appointment_date) != null ? ` — expires in ${daysUntilExpiry(access.activeAppointment?.appointment_date)} days` : ''}</span>
                 )}
               </div>
 
@@ -126,7 +127,7 @@ export default function PatientRecordsDialog({ patientName, doctorId, open, onCl
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{rec.title}</p>
-                          <p className="text-xs text-muted-foreground">{rec.category} · {rec.date}</p>
+                          <p className="text-xs text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
                           {rec.doctor_name && (
                             <p className="text-[10px] text-muted-foreground mt-0.5">Dr. {rec.doctor_name}</p>
                           )}

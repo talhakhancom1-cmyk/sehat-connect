@@ -27,20 +27,27 @@ function itemToMedication(item) {
 
 router.get('/', authenticate, async (req, res) => {
   try {
-    const where = {};
-    if (req.query.doctor_id) where.doctor_id = req.query.doctor_id;
-    if (req.query.patient_id) where.patient_id = req.query.patient_id;
-    if (req.query.patient_name) where.patient_name = req.query.patient_name;
-    if (req.query.status) where.status = req.query.status;
+    const andConditions = [];
 
+    // Apply explicit query filters
+    if (req.query.doctor_id) andConditions.push({ doctor_id: req.query.doctor_id });
+    if (req.query.patient_id) andConditions.push({ patient_id: req.query.patient_id });
+    if (req.query.patient_name) andConditions.push({ patient_name: req.query.patient_name });
+    if (req.query.status) andConditions.push({ status: req.query.status });
+
+    // Apply ownership scope for non-admins (ANDed with explicit filters,
+    // not overwriting them — this was the bug that prevented patients from
+    // seeing their own prescriptions).
     if (!isAdmin(req.user)) {
       const myDoctor = await Doctor.findOne({
         where: req.user.email ? { [Op.or]: [{ user_id: req.user.id }, { email: req.user.email }] } : { user_id: req.user.id }
       }).catch(() => null);
       const ownership = [{ patient_id: req.user.id }, { signed_by_user_id: req.user.id }];
       if (myDoctor) ownership.push({ doctor_id: myDoctor.id });
-      where[Op.and] = [{ [Op.or]: ownership }];
+      andConditions.push({ [Op.or]: ownership });
     }
+
+    const where = andConditions.length ? { [Op.and]: andConditions } : {};
 
     const { offset, limit } = paginate(req);
     const { rows, count } = await Prescription.findAndCountAll({

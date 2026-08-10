@@ -5,6 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import { Pill, Download, Clock, FileText } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { generatePrescriptionPdf } from '@/lib/prescriptionPdf';
+import { formatAppointmentDate } from '@/lib/utils';
 
 export default function Prescriptions() {
   const { user } = useAuth();
@@ -42,7 +43,7 @@ export default function Prescriptions() {
                   <p className="text-sm font-semibold truncate">Dr. {presc.doctor_name}</p>
                   <StatusBadge status={presc.status} />
                 </div>
-                <p className="text-[11px] text-muted-foreground font-mono">{presc.date}</p>
+                <p className="text-[11px] text-muted-foreground font-mono">{formatAppointmentDate(presc.date)}</p>
                 <p className="text-xs text-muted-foreground mt-1 truncate">{presc.diagnosis || 'General consultation'}</p>
                 <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
                   <Pill className="w-3 h-3" />
@@ -69,7 +70,7 @@ export default function Prescriptions() {
                   <p className="text-sm text-primary">{selected.doctor_specialty || 'General Physician'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground font-mono">{selected.date}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{formatAppointmentDate(selected.date)}</p>
                   <StatusBadge status={selected.status} className="mt-1" />
                 </div>
               </div>

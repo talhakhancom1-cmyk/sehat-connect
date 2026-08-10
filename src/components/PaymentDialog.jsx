@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { createNotification } from '@/lib/notifications';
 import { useToast } from '@/components/ui/use-toast';
 import { X, CreditCard, Wallet, Building2, Banknote, ShieldCheck, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatAppointmentDate } from '@/lib/utils';
 
 const methods = [
   { id: 'jazzcash', label: 'JazzCash', icon: Wallet, hint: 'Mobile wallet' },
@@ -94,7 +94,7 @@ export default function PaymentDialog({ appointment, open, onClose, onPaid }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>
             <h2 className="text-base font-bold">Checkout</h2>
-            <p className="text-xs text-muted-foreground">{appointment.doctor_name} · {appointment.appointment_date} {appointment.time_slot}</p>
+            <p className="text-xs text-muted-foreground">{appointment.doctor_name} · {formatAppointmentDate(appointment.appointment_date)} {appointment.time_slot}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-secondary transition-colors"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>

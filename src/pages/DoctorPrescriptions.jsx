@@ -8,6 +8,7 @@ import { useDoctorProfile } from '@/lib/useRole';
 import { recordAudit } from '@/lib/audit';
 import { plansFromPrescription } from '@/lib/medication';
 import { generatePrescriptionPdf } from '@/lib/prescriptionPdf';
+import { formatAppointmentDate } from '@/lib/utils';
 import { Plus, FileText, ShieldCheck, Pill, Download, FileSignature, X } from 'lucide-react';
 
 export default function DoctorPrescriptions() {
@@ -95,7 +96,7 @@ export default function DoctorPrescriptions() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold">{presc.patient_name}</p>
-                    <p className="text-[11px] text-muted-foreground font-mono">{presc.date}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">{formatAppointmentDate(presc.date)}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {presc.is_signed ? (
@@ -140,7 +141,7 @@ export default function DoctorPrescriptions() {
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div><p className="font-semibold text-sm">{selected.patient_name}</p><p className="text-xs text-primary">{selected.doctor_specialty}</p></div>
-                <div className="text-right"><p className="text-xs text-muted-foreground font-mono">{selected.date}</p>{selected.is_signed && <span className="text-[10px] text-green-700 font-semibold">Signed {selected.signed_at?.slice(0, 10)}</span>}</div>
+                <div className="text-right"><p className="text-xs text-muted-foreground font-mono">{formatAppointmentDate(selected.date)}</p>{selected.is_signed && <span className="text-[10px] text-green-700 font-semibold">Signed {selected.signed_at?.slice(0, 10)}</span>}</div>
               </div>
               {selected.diagnosis && <div className="p-3 rounded-xl bg-secondary/30"><p className="text-[10px] uppercase text-muted-foreground">Diagnosis</p><p className="text-sm">{selected.diagnosis}</p></div>}
               <div className="space-y-2">
