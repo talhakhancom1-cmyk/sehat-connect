@@ -157,6 +157,14 @@ const migrateMissingColumns = async () => {
     `CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`,
     `CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_id);`,
     `CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);`,
+    // Message call-log columns (added for call logging feature)
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_direction VARCHAR(255);`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_status VARCHAR(255);`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_duration INTEGER;`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS call_type VARCHAR(255);`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_message_id VARCHAR(255);`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;`,
+    `ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_by_ids TEXT;`,
   ];
   for (const sql of statements) {
     try {
