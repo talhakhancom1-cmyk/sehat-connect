@@ -168,31 +168,31 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
 
       {/* In-call controls */}
       {status === 'connected' && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-4">
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-4 sm:p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-3 sm:gap-4">
           <button
             onClick={toggleMute}
-            className={'p-4 rounded-full transition-all active:scale-95 ' + (muted ? 'bg-white/10 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
+            className={'p-3.5 sm:p-4 rounded-full transition-all active:scale-95 ' + (muted ? 'bg-white/10 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
             title={muted ? 'Unmute' : 'Mute'}
           >
-            {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {muted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
           </button>
           <button
             onClick={toggleCamera}
-            className={'p-4 rounded-full transition-all active:scale-95 ' + (cameraOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white/10 text-white')}
+            className={'p-3.5 sm:p-4 rounded-full transition-all active:scale-95 ' + (cameraOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-white/10 text-white')}
             title={cameraOn ? 'Turn off camera' : 'Turn on camera'}
           >
-            {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            {cameraOn ? <Video className="w-5 h-5 sm:w-6 sm:h-6" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
           </button>
           <button
             onClick={switchCamera}
-            className="p-4 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all active:scale-95"
+            className="p-3.5 sm:p-4 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all active:scale-95"
             title="Switch camera"
           >
-            <SwitchCamera className="w-6 h-6" />
+            <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           <button
             onClick={handleEnd}
-            className="flex items-center gap-2 px-8 py-4 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
+            className="flex items-center gap-2 px-6 py-3 sm:px-8 sm:py-4 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
           >
             <PhoneOff className="w-5 h-5" />
             End Call

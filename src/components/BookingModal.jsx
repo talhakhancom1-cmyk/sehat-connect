@@ -159,7 +159,7 @@ export default function BookingModal({ doctor, onClose, onConfirm }) {
           </div>
 
           {/* Stat Badges */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {stats.map((stat, i) => {
               const Icon = stat.icon;
               return (

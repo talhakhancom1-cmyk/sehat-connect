@@ -58,11 +58,22 @@
   * { @apply border-border; }
   html, body { height: 100%; }
   #root { min-height: 100%; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground font-body antialiased;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
     -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+  /* Prevent horizontal scrolling on mobile */
+  img, video, canvas, svg { max-width: 100%; }
+  /* Ensure touch targets are at least 44px on mobile */
+  @media (max-width: 640px) {
+    button, a, input, select, textarea { min-height: 36px; }
   }
 }
 

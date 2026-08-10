@@ -121,30 +121,30 @@ export default function AudioCall({ callId, role, remoteUserId, _displayName, ot
         </button>
       </div>
 
-      <div className={'w-24 h-24 rounded-full bg-primary/90 flex items-center justify-center text-white text-3xl font-bold mb-5 ' + (status === 'connected' ? '' : 'animate-pulse-glow')}>
+      <div className={'w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/90 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold mb-5 ' + (status === 'connected' ? '' : 'animate-pulse-glow')}>
         {(otherName || 'U').slice(0, 1).toUpperCase()}
       </div>
-      <p className="text-white font-semibold text-lg">{otherName || 'Voice Call'}</p>
-      <p className="text-white/50 text-sm mb-10">{statusLabel}</p>
+      <p className="text-white font-semibold text-base sm:text-lg">{otherName || 'Voice Call'}</p>
+      <p className="text-white/50 text-sm mb-8 sm:mb-10">{statusLabel}</p>
 
       {error && (
-        <div className="absolute bottom-32 text-center px-6">
+        <div className="absolute bottom-28 sm:bottom-32 text-center px-6">
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <button
           onClick={toggleMute}
           disabled={status !== 'connected'}
-          className={'p-4 rounded-full transition-all active:scale-95 disabled:opacity-30 ' + (muted ? 'bg-white/10 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
+          className={'p-3.5 sm:p-4 rounded-full transition-all active:scale-95 disabled:opacity-30 ' + (muted ? 'bg-white/10 text-white' : 'bg-white/20 text-white hover:bg-white/30')}
           title={muted ? 'Unmute' : 'Mute'}
         >
-          {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          {muted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
         </button>
         <button
           onClick={handleEnd}
-          className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
+          className="flex items-center gap-2 px-6 py-3 sm:px-8 sm:py-3.5 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
         >
           <PhoneOff className="w-5 h-5" />
           {status === 'connected' ? 'End Call' : 'Cancel'}

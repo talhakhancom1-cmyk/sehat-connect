@@ -226,7 +226,7 @@ export default function EditProfile() {
             <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11" placeholder="+92 300 1234567" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
               <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} className="h-11" />
@@ -272,7 +272,7 @@ export default function EditProfile() {
               <Input id="allergies" value={allergies} onChange={(e) => setAllergies(e.target.value)} className="h-11" placeholder="e.g. Penicillin, Peanuts" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ec-name">Emergency contact name</Label>
                 <Input id="ec-name" value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)} className="h-11" />

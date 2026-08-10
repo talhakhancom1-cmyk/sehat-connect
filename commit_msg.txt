@@ -1,33 +1,19 @@
-Fix profile picture fallback, add notification beep, fix OTP public flag
+Mobile responsive fixes for key screens
 
-#1 Profile picture fallback:
-- Removed lib/doctorPhotos.js which returned random Unsplash stock
-  photos when no profile picture was uploaded.
-- Updated DoctorAvatar.jsx to show initials on a colored circle
-  when no imageUrl is provided, instead of fetching a random photo.
-- Real uploaded photos still display correctly via authFileUrl().
-- All 15 files using DoctorAvatar now show consistent initials fallback.
-- TopBar, IncomingCallOverlay, AudioCall already used initials —
-  no change needed there.
-
-#4 OTP - public flag endpoint:
-- Added GET /api/email-config/public-flags (no auth required) that
-  returns only { configured, enable_signup_otp } so the Register
-  page can check if OTP is enabled without admin credentials.
-- Updated Register.jsx to use the public endpoint instead of the
-  admin-only /email-config route.
-
-#2 Notification beep sound:
-- Created lib/notificationSound.js using Web Audio API (no external
-  file needed). Plays a subtle two-tone "ding-dong" (880Hz + 1100Hz).
-- Handles browser autoplay restrictions: AudioContext is created
-  lazily, primed on first user interaction (click/touch/keydown).
-- Added onNotificationNew() to socketClient.js to subscribe to the
-  existing 'notification:new' socket event from the backend.
-- TopBar now plays the beep when a real-time notification or chat
-  message arrives (not on page load for old notifications).
-- Only beeps for chat messages if user is NOT in the active chat
-  thread (avoids double-notification when already reading).
+#3 Mobile responsive design:
+- BookingModal: stat badges grid now collapses to 2 cols on mobile
+  (was grid-cols-4, now grid-cols-2 sm:grid-cols-4)
+- EditProfile: city/country and emergency contact grids now
+  collapse to 1 col on mobile (was grid-cols-2, now
+  grid-cols-1 sm:grid-cols-2)
+- VideoCall: control button padding reduced on mobile (p-3.5 sm:p-4),
+  icon sizes responsive (w-5 sm:w-6), end call button smaller on
+  mobile (px-6 py-3 sm:px-8 sm:py-4)
+- AudioCall: avatar smaller on mobile (w-20 sm:w-24), button padding
+  and icon sizes responsive, end call button responsive
+- index.css: added overflow-x: hidden on body to prevent horizontal
+  scroll, max-width: 100% on img/video/canvas/svg, minimum touch
+  target size on mobile
 
 Generated with [Devin](https://devin.ai)
 
