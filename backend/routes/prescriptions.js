@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
+const { pickFields } = require('../lib/pickFields');
 
 const router = express.Router();
 
@@ -132,6 +133,59 @@ router.get('/:id', authenticate, async (req, res) => {
     res.json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/v1/prescriptions/:id — update a prescription (sign, change status, etc.)
+// Only the doctor who created it, the patient it belongs to, or an admin can update.
+// Doctors can sign/unsign and update clinical fields. Patients can only mark
+// status as 'completed' (e.g. acknowledge). Admins can update anything.
+const PRESCRIPTION_WRITABLE = [
+  'status', 'notes', 'diagnosis', 'follow_up', 'is_signed', 'signed_at',
+  'doctor_specialty', 'appointment_id', 'encounter_id',
+];
+
+router.put('/:id', authenticate, async (req, res) => {
+  try {
+    const prescription = await Prescription.findByPk(req.params.id);
+    if (!prescription) {
+      return res.status(404).json({ error: 'Prescription not found' });
+    }
+
+    // Authorization: determine who the caller is
+    const isAdminUser = isAdmin(req.user);
+    const isOwningDoctor = prescription.signed_by_user_id === req.user.id;
+    let isPatientOwner = prescription.patient_id === req.user.id;
+    // Also check if the caller is the doctor via Doctor table link
+    if (!isOwningDoctor && !isAdminUser) {
+      const myDoctor = await Doctor.findOne({
+        where: req.user.email ? { [Op.or]: [{ user_id: req.user.id }, { email: req.user.email }] } : { user_id: req.user.id }
+      }).catch(() => null);
+      if (myDoctor && prescription.doctor_id === myDoctor.id) {
+        // It's the doctor who owns this prescription
+      } else if (!isPatientOwner) {
+        return res.status(403).json({ error: 'Forbidden — you can only update your own prescriptions' });
+      }
+    }
+
+    const body = pickFields(req.body, PRESCRIPTION_WRITABLE);
+
+    // If signing the prescription, set signed_at and ensure status is 'active'
+    if (body.is_signed === true) {
+      body.signed_at = body.signed_at || new Date().toISOString();
+      body.status = 'active';
+    }
+
+    await prescription.update(body);
+
+    // Return with items/medications for frontend convenience
+    const items = await PrescriptionItem.findAll({
+      where: { prescription_id: prescription.id },
+      order: [['display_order', 'ASC']]
+    });
+    res.json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

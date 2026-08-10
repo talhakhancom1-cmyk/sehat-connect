@@ -52,9 +52,14 @@ export default function DoctorPrescriptions() {
   };
 
   const signPrescription = async (presc) => {
-    await base44.entities.Prescription.update(presc.id, { is_signed: true, signed_at: new Date().toISOString() });
-    await recordAudit({ action: 'prescription_sign', target_type: 'Prescription', target_id: presc.id, patient_id: presc.patient_id, detail: 'Doctor signed prescription' });
-    load();
+    try {
+      await base44.entities.Prescription.update(presc.id, { is_signed: true, signed_at: new Date().toISOString() });
+      await recordAudit({ action: 'prescription_sign', target_type: 'Prescription', target_id: presc.id, patient_id: presc.patient_id, detail: 'Doctor signed prescription' });
+      load();
+    } catch (err) {
+      console.error('Sign prescription failed:', err);
+      alert('Could not sign prescription: ' + (err?.message || 'Unknown error'));
+    }
   };
 
   const generatePlans = async (presc) => {
