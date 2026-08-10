@@ -138,7 +138,7 @@ export default function ChatThread() {
       // Notify the other party of the new message
       const other = otherParty(conversation, user?.id);
       if (other?.id) {
-        createNotification(other.id, 'chat', `New message from ${user?.full_name || 'User'}`, content.slice(0, 80), {
+        createNotification(other.id, 'chat', `New message from ${user?.display_name || user?.email || 'User'}`, content.slice(0, 80), {
           priority: 'normal',
           data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id },
         });
@@ -161,7 +161,7 @@ export default function ChatThread() {
       });
       const op = otherParty(conversation, user?.id);
       if (op?.id) {
-        createNotification(op.id, 'chat', `Voice note from ${user?.full_name || 'User'}`, 'Voice message', {
+        createNotification(op.id, 'chat', `Voice note from ${user?.display_name || user?.email || 'User'}`, 'Voice message', {
           priority: 'normal',
           data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id },
         });
@@ -187,7 +187,7 @@ export default function ChatThread() {
     try {
       await sendMessage(conversation, user, '📞 Voice call started', { type: 'system', attachment_url: room });
       if (other?.id) {
-        createNotification(other.id, 'chat', `📞 Incoming voice call from ${user?.full_name || 'User'}`, 'Tap to join the call', {
+        createNotification(other.id, 'chat', `📞 Incoming voice call from ${user?.display_name || user?.email || 'User'}`, 'Tap to join the call', {
           priority: 'high',
           data: { conversation_id: conversation.id, appointment_id: conversation.appointment_id, call_room: room },
         });

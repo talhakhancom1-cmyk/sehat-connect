@@ -71,7 +71,7 @@ export async function sendMessage(conversation, user, content, opts = {}) {
   const msg = await base44.entities.Message.create({
     conversation_id: conversation.id,
     sender_id: user.id,
-    sender_name: user.full_name || user.email,
+    sender_name: user.display_name || user.full_name || user.email,
     receiver_id: other.id,
     receiver_name: other.name,
     content,

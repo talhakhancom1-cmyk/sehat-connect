@@ -53,9 +53,7 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
       // Link any prescriptions already issued for this appointment.
       const prescs = await base44.entities.Prescription.filter({ appointment_id: appointment.id });
       if (prescs.length) {
-        await base44.entities.Prescription.bulkUpdate(
-          prescs.map(p => ({ id: p.id, encounter_id: encounter.id }))
-        );
+        await Promise.all(prescs.map(p => base44.entities.Prescription.update(p.id, { encounter_id: encounter.id })));
       }
 
       await recordAudit({
@@ -68,6 +66,9 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
 
       onSaved?.();
       onClose?.();
+    } catch (err) {
+      console.error('Encounter save failed:', err);
+      alert('Could not save encounter: ' + (err?.message || 'Unknown error'));
     } finally { setSaving(false); }
   };
 

@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const router = express.Router();
 const Appointment = require('../models/Appointment');
 const Doctor = require('../models/Doctor');
+const User = require('../models/User');
 const { authenticate } = require('../middleware/auth');
 const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
@@ -79,17 +80,24 @@ router.get('/', authenticate, async (req, res) => {
       offset,
       limit
     });
-    // Enrich each appointment with the doctor's profile picture so the frontend
-    // can render the real uploaded photo (appointment.doctor_image) instead of
-    // falling back to a random placeholder.
+    // Enrich each appointment with profile pictures for both the doctor and
+    // the patient so the frontend can render real uploaded photos instead of
+    // falling back to random placeholders.
     const doctorIds = [...new Set(rows.map(a => a.doctor_id).filter(Boolean))];
-    const doctors = doctorIds.length ? await Doctor.findAll({ where: { id: doctorIds } }).catch(() => []) : [];
+    const patientIds = [...new Set(rows.map(a => a.patient_id).filter(Boolean))];
+    const [doctors, patients] = await Promise.all([
+      doctorIds.length ? Doctor.findAll({ where: { id: doctorIds } }).catch(() => []) : [],
+      patientIds.length ? User.findAll({ where: { id: patientIds } }).catch(() => []) : [],
+    ]);
     const doctorImageById = {};
     for (const d of doctors) doctorImageById[d.id] = d.profile_pic_url || null;
+    const patientImageById = {};
+    for (const p of patients) patientImageById[p.id] = p.profile_pic_url || null;
     const result = rows.map(a => ({
       ...a.toJSON(),
       appointment_date: normalizeDate(a.appointment_date),
       doctor_image: doctorImageById[a.doctor_id] || null,
+      patient_image: patientImageById[a.patient_id] || null,
       created_date: a.created_at
     }));
     res.json(buildPaginatedResponse(req, result, count));
@@ -108,8 +116,16 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!(await canAccessAppointment(appointment, req.user))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const doctor = appointment.doctor_id ? await Doctor.findByPk(appointment.doctor_id).catch(() => null) : null;
-    res.json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date), doctor_image: doctor?.profile_pic_url || null });
+    const [doctor, patient] = await Promise.all([
+      appointment.doctor_id ? Doctor.findByPk(appointment.doctor_id).catch(() => null) : null,
+      appointment.patient_id ? User.findByPk(appointment.patient_id).catch(() => null) : null,
+    ]);
+    res.json({
+      ...appointment.toJSON(),
+      appointment_date: normalizeDate(appointment.appointment_date),
+      doctor_image: doctor?.profile_pic_url || null,
+      patient_image: patient?.profile_pic_url || null,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -59,7 +59,7 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
             <DoctorAvatar name={name} imageUrl={appointment.doctor_image} size="lg" />
           </Link>
         ) : (
-          <DoctorAvatar name={name} imageUrl={role === 'doctor' ? null : appointment.doctor_image} size="lg" />
+          <DoctorAvatar name={name} imageUrl={role === 'doctor' ? appointment.patient_image : appointment.doctor_image} size="lg" />
         )}
 
         <div className="flex-1 min-w-0">
