@@ -65,6 +65,14 @@ export default function AdminEmailConfig() {
   const [testEmail, setTestEmail] = useState('');
   const [testResult, setTestResult] = useState(null);
 
+  // Direct DOM refs for the critical SMTP fields — bypasses any React state
+  // issues (stale closures, re-renders resetting form, etc.) by reading
+  // values straight from the input elements at save time.
+  const smtpHostRef = useRef(null);
+  const smtpUsernameRef = useRef(null);
+  const smtpPasswordRef = useRef(null);
+  const fromEmailRef = useRef(null);
+
   const [form, setForm] = useState({
     smtp_host: '',
     smtp_port: 587,
@@ -146,37 +154,50 @@ export default function AdminEmailConfig() {
   };
 
   const save = async () => {
-    // Read from ref to avoid any stale closure issues.
+    // Read critical fields directly from the DOM inputs — this bypasses
+    // any React state issues (stale closures, re-renders, etc.) by getting
+    // the exact value the user sees on screen.
+    const host = (smtpHostRef.current?.value || '').trim();
+    const username = (smtpUsernameRef.current?.value || '').trim();
+    const fromEmail = (fromEmailRef.current?.value || '').trim();
+    const password = (smtpPasswordRef.current?.value || '').trim();
     const f = formRef.current;
-    console.log('[SMTP] save called, form state:', {
-      smtp_host: f.smtp_host,
-      smtp_username: f.smtp_username,
-      from_email: f.from_email,
-      smtp_password: f.smtp_password ? '(set)' : '(empty)',
-      smtp_port: f.smtp_port,
+
+    console.log('[SMTP] save called', {
+      dom: { host, username, fromEmail, password: password ? '(set)' : '(empty)' },
+      state: { host: f.smtp_host, username: f.smtp_username, fromEmail: f.from_email },
     });
-    const host = (f.smtp_host || '').trim();
-    const username = (f.smtp_username || '').trim();
-    const fromEmail = (f.from_email || '').trim();
+
     if (!host || !username || !fromEmail) {
       console.error('[SMTP] validation failed:', { host: !!host, username: !!username, fromEmail: !!fromEmail });
       toast({ title: 'Missing fields', description: 'SMTP host, username, and from email are required', variant: 'destructive' });
       return;
     }
-    if (!config && !f.smtp_password) {
+    if (!config && !password) {
       toast({ title: 'Password required', description: 'SMTP password is required on first setup', variant: 'destructive' });
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...f, smtp_host: host, smtp_username: username, from_email: fromEmail };
-      // Don't send empty password on update
-      if (config && !payload.smtp_password) delete payload.smtp_password;
+      // Build payload from form state for non-critical fields, but override
+      // the critical ones with DOM-read values.
+      const payload = {
+        ...f,
+        smtp_host: host,
+        smtp_username: username,
+        from_email: fromEmail,
+      };
+      if (password) {
+        payload.smtp_password = password;
+      } else if (config) {
+        delete payload.smtp_password;
+      }
       console.log('[SMTP] sending payload to backend:', { ...payload, smtp_password: payload.smtp_password ? '(set)' : '(omitted)' });
       await apiRequest('/email-config', { method: 'POST', body: payload });
       toast({ title: 'Email settings saved' });
       await load();
     } catch (e) {
+      console.error('[SMTP] save failed:', e);
       toast({ title: 'Failed to save', description: String(e?.message || e), variant: 'destructive' });
     } finally {
       setSaving(false);
@@ -280,6 +301,7 @@ export default function AdminEmailConfig() {
                   <Label htmlFor="smtp_host" className="text-xs">SMTP Host</Label>
                   <Input
                     id="smtp_host"
+                    ref={smtpHostRef}
                     value={form.smtp_host}
                     onChange={(e) => update('smtp_host', e.target.value)}
                     placeholder="smtp.gmail.com"
@@ -302,6 +324,7 @@ export default function AdminEmailConfig() {
                   <Label htmlFor="smtp_username" className="text-xs">Username</Label>
                   <Input
                     id="smtp_username"
+                    ref={smtpUsernameRef}
                     value={form.smtp_username}
                     onChange={(e) => update('smtp_username', e.target.value)}
                     placeholder="your@email.com or apikey"
@@ -313,6 +336,7 @@ export default function AdminEmailConfig() {
                   </Label>
                   <Input
                     id="smtp_password"
+                    ref={smtpPasswordRef}
                     type="password"
                     value={form.smtp_password}
                     onChange={(e) => update('smtp_password', e.target.value)}
@@ -338,6 +362,7 @@ export default function AdminEmailConfig() {
                   <Label htmlFor="from_email" className="text-xs">From Email</Label>
                   <Input
                     id="from_email"
+                    ref={fromEmailRef}
                     type="email"
                     value={form.from_email}
                     onChange={(e) => update('from_email', e.target.value)}
@@ -399,7 +424,7 @@ export default function AdminEmailConfig() {
 
             {/* Save + Test */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={save} disabled={saving} className="flex items-center gap-1.5">
+              <Button type="button" onClick={save} disabled={saving} className="flex items-center gap-1.5">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? 'Saving…' : 'Save Settings'}
               </Button>
