@@ -198,12 +198,10 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
 
         // Fetch caller's display info to send with the ringing event.
         const caller = await User.findByPk(userId, {
-          attributes: ['id', 'first_name', 'last_name', 'profile_image_url'],
+          attributes: ['id', 'display_name', 'profile_pic_url'],
         });
-        const callerName = caller
-          ? `${caller.first_name || ''} ${caller.last_name || ''}`.trim() || 'Unknown'
-          : 'Unknown';
-        const callerImageUrl = caller?.profile_image_url || null;
+        const callerName = caller?.display_name || 'Unknown';
+        const callerImageUrl = caller?.profile_pic_url || null;
 
         // Ring the target user (only if they have sockets online).
         const targetSockets = getSocketIdsForUser(to_user_id);
@@ -434,18 +432,16 @@ function buildBroadcasters(io) {
      */
     async emitCallRinging(callId, fromUserId, toUserId) {
       const caller = await User.findByPk(fromUserId, {
-        attributes: ['id', 'first_name', 'last_name', 'profile_image_url'],
+        attributes: ['id', 'display_name', 'profile_pic_url'],
       });
-      const callerName = caller
-        ? `${caller.first_name || ''} ${caller.last_name || ''}`.trim() || 'Unknown'
-        : 'Unknown';
+      const callerName = caller?.display_name || 'Unknown';
       const targetSockets = getSocketIdsForUser(toUserId);
       targetSockets.forEach((sid) => {
         io.to(sid).emit('call:ringing', {
           call_id: callId,
           from_user_id: fromUserId,
           caller_name: callerName,
-          caller_image_url: caller?.profile_image_url || null,
+          caller_image_url: caller?.profile_pic_url || null,
         });
       });
     },
