@@ -22,6 +22,7 @@ export default function GlobalCallOverlay() {
       callId: activeCall.callId,
       role: activeCall.role,
       remoteUserId: activeCall.remoteUserId,
+      otherName: activeCall.otherName || 'User',
       onClose: activeCall.role === 'caller' ? cancelOutgoing : endCall,
     };
     return activeCall.video
@@ -34,6 +35,7 @@ export default function GlobalCallOverlay() {
     return (
       <IncomingCallOverlay
         callerName={incomingCall.callerName}
+        callType={incomingCall.call_type}
         onAccept={acceptCall}
         onDecline={declineCall}
       />

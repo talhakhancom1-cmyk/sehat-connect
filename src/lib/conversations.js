@@ -89,3 +89,23 @@ export async function markConversationRead(conversationId, userId) {
     await base44.entities.Message.update(m.id, { read: true }).catch(() => {});
   }
 }
+
+/**
+ * Create or update a call log entry in the chat thread.
+ * If call_id matches an existing call log, it updates the status/duration.
+ * Otherwise it creates a new call log message.
+ */
+export async function logCall(conversationId, { call_id, call_type, direction, status, duration, receiver_id, receiver_name, sender_name }) {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+  const token = localStorage.getItem('ehc_token');
+  const res = await fetch(`${API_BASE_URL}/v1/conversations/${conversationId}/call-log`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ call_id, call_type, direction, status, duration, receiver_id, receiver_name, sender_name }),
+  });
+  if (!res.ok) throw new Error('Failed to log call');
+  return res.json();
+}

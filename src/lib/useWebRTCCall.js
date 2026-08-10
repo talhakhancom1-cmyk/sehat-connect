@@ -262,5 +262,11 @@ export function useWebRTCCall({ callId, remoteUserId, role, video = false, onEnd
     return newOn;
   }, []);
 
-  return { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, endCall };
+  const switchCamera = useCallback(async () => {
+    const call = callRef.current;
+    if (!call) return false;
+    return call.switchCamera();
+  }, []);
+
+  return { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, switchCamera, endCall };
 }

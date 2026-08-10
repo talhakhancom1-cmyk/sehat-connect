@@ -115,7 +115,7 @@ export default function AudioCall({ callId, role, remoteUserId, _displayName, ot
           className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition-all active:scale-95 shadow-lg"
         >
           <PhoneOff className="w-5 h-5" />
-          End Call
+          {status === 'connected' ? 'End Call' : 'Cancel'}
         </button>
       </div>
     </div>

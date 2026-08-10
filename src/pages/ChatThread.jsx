@@ -11,7 +11,7 @@ import VoiceMessage from '@/components/chat/VoiceMessage';
 import { otherParty, listMessages, sendMessage, markConversationRead } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
 import { joinConversation, leaveConversation } from '@/lib/socketClient';
-import { ChevronLeft, Send, Check, CheckCheck, Phone } from 'lucide-react';
+import { ChevronLeft, Send, Check, CheckCheck, Phone, PhoneMissed, PhoneIncoming, PhoneOutgoing, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Stable chronological sort by created_date only.
@@ -233,6 +233,8 @@ export default function ChatThread() {
                     )}>
                       {msg.type === 'audio' && msg.attachment_url ? (
                         <VoiceMessage url={msg.attachment_url} mine={isMe} />
+                      ) : msg.type === 'call' ? (
+                        <CallLogBubble msg={msg} isMe={isMe} />
                       ) : msg.type === 'system' ? (
                         // Legacy system messages (e.g. old call signals) are shown
                         // as plain text — call signaling now uses WebSockets.
@@ -290,5 +292,40 @@ export default function ChatThread() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+function CallLogBubble({ msg, isMe }) {
+  const status = msg.call_status || 'initiated';
+  const direction = msg.call_direction || (isMe ? 'outgoing' : 'incoming');
+  const callType = msg.call_type || 'audio';
+  const duration = msg.call_duration || 0;
+
+  const isVideo = callType === 'video';
+  const isMissed = status === 'missed';
+  const isDeclined = status === 'declined';
+  const isEnded = status === 'ended' && duration > 0;
+  const isInitiated = status === 'initiated' || status === 'connected';
+
+  const Icon = isMissed ? PhoneMissed
+    : isVideo ? Video
+    : direction === 'outgoing' ? PhoneOutgoing
+    : PhoneIncoming;
+
+  const label = isMissed ? 'Missed call'
+    : isDeclined ? 'Call declined'
+    : isEnded ? `Call ended - ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`
+    : isInitiated ? `${isVideo ? 'Video' : 'Voice'} call`
+    : msg.content || 'Call';
+
+  const color = isMissed || isDeclined
+    ? 'text-red-500'
+    : isMe ? 'text-primary-foreground' : 'text-primary';
+
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <Icon className={cn('w-4 h-4 shrink-0', color)} />
+      <span className={cn('text-sm font-medium', color)}>{label}</span>
+    </div>
   );
 }

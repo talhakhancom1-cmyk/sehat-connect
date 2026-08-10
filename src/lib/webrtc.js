@@ -171,6 +171,36 @@ export class WebRTCCall {
     return enabled;
   }
 
+  /** Switch between front/back camera (video calls only, mobile). */
+  async switchCamera() {
+    if (!this.localStream) return false;
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (!videoTrack) return false;
+    const facingMode = videoTrack.getSettings().facingMode;
+    const newFacing = facingMode === 'user' ? 'environment' : 'user';
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacing },
+        audio: false,
+      });
+      const newTrack = newStream.getVideoTracks()[0];
+      if (!newTrack) return false;
+      // Replace the track in the peer connection.
+      const sender = this.pc?.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (sender) {
+        await sender.replaceTrack(newTrack);
+      }
+      // Stop the old track and update the local stream.
+      videoTrack.stop();
+      this.localStream.removeTrack(videoTrack);
+      this.localStream.addTrack(newTrack);
+      return newFacing;
+    } catch (e) {
+      this.onError?.(e);
+      return false;
+    }
+  }
+
   /** Tear down the call — stops all tracks and closes the peer connection. */
   close() {
     this._closed = true;

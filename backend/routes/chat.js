@@ -337,6 +337,85 @@ router.post('/messages', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/v1/conversations/:conversationId/call-log
+// Creates or updates a call log entry in the chat thread.
+// Body: { call_type, direction, status, duration, call_id, receiver_id, receiver_name }
+router.post('/conversations/:conversationId/call-log', authenticate, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const body = req.body || {};
+    const conversation = await Conversation.findByPk(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // If call_id is provided, try to find an existing call log to update.
+    if (body.call_id) {
+      const existing = await Message.findOne({
+        where: {
+          conversation_id: conversationId,
+          type: 'call',
+          client_message_id: body.call_id,
+        },
+      });
+      if (existing) {
+        await existing.update({
+          call_status: body.status || existing.call_status,
+          call_duration: body.duration !== undefined ? body.duration : existing.call_duration,
+          content: body.status === 'missed' ? 'Missed call'
+            : body.status === 'declined' ? 'Call declined'
+            : body.status === 'ended' && body.duration ? `Call ended - ${Math.floor(body.duration / 60)}:${String(body.duration % 60).padStart(2, '0')}`
+            : body.status === 'connected' ? 'Call connected'
+            : existing.content,
+        });
+        const broadcasters = req.app.get('broadcasters');
+        if (broadcasters) broadcasters.emitMessage(conversationId, existing);
+        return res.json({
+          ...existing.toJSON(),
+          created_date: existing.created_at,
+          updated_date: existing.updated_at,
+        });
+      }
+    }
+
+    // Create a new call log entry.
+    const status = body.status || 'initiated';
+    const message = await Message.create({
+      conversation_id: conversationId,
+      sender_id: req.user.id,
+      sender_name: body.sender_name || req.user.display_name || req.user.full_name,
+      sender_role: req.user.role,
+      receiver_id: body.receiver_id,
+      receiver_name: body.receiver_name,
+      content: status === 'missed' ? 'Missed call'
+        : status === 'declined' ? 'Call declined'
+        : status === 'ended' && body.duration ? `Call ended - ${Math.floor(body.duration / 60)}:${String(body.duration % 60).padStart(2, '0')}`
+        : status === 'connected' ? 'Call connected'
+        : 'Call started',
+      body: null,
+      type: 'call',
+      message_type: 'call',
+      call_direction: body.direction || 'outgoing',
+      call_status: status,
+      call_duration: body.duration || null,
+      call_type: body.call_type || 'audio',
+      client_message_id: body.call_id || null,
+      read: false,
+      status: 'sent',
+    });
+    await conversation.update({ last_message_at: new Date() });
+    const broadcasters = req.app.get('broadcasters');
+    if (broadcasters) broadcasters.emitMessage(conversationId, message);
+    res.status(201).json({
+      ...message.toJSON(),
+      created_date: message.created_at,
+      updated_date: message.updated_at,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // GET /api/v1/messages/:id
 router.get('/messages/:id', authenticate, async (req, res) => {
   try {

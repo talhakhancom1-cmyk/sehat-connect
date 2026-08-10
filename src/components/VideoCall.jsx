@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { X, PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera } from 'lucide-react';
 import { useWebRTCCall } from '@/lib/useWebRTCCall';
 
 /**
@@ -13,13 +13,14 @@ import { useWebRTCCall } from '@/lib/useWebRTCCall';
  *   doctorName   — the other party's display name (kept for backwards compat)
  *   onClose      — called when the call ends or the user closes the window
  */
-export default function VideoCall({ callId, role, remoteUserId, _displayName, doctorName, onClose }) {
+export default function VideoCall({ callId, role, remoteUserId, _displayName, doctorName, otherName, onClose }) {
   const [seconds, setSeconds] = useState(0);
   const [waiting, setWaiting] = useState(0);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const displayName = otherName || doctorName || 'Video Call';
 
-  const { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, endCall } = useWebRTCCall({
+  const { status, error, localStream, remoteStream, muted, cameraOn, toggleMute, toggleCamera, switchCamera, endCall } = useWebRTCCall({
     callId,
     role,
     remoteUserId,
@@ -89,7 +90,7 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
           </div>
           <div className="h-4 w-px bg-white/20" />
           <div className="text-white">
-            <p className="text-sm font-semibold">{doctorName || 'Video Consultation'}</p>
+            <p className="text-sm font-semibold">{displayName}</p>
             <p className="text-[11px] text-white/60">{statusLabel}</p>
           </div>
         </div>
@@ -157,6 +158,13 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
             title={cameraOn ? 'Turn off camera' : 'Turn on camera'}
           >
             {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+          </button>
+          <button
+            onClick={switchCamera}
+            className="p-4 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all active:scale-95"
+            title="Switch camera"
+          >
+            <SwitchCamera className="w-6 h-6" />
           </button>
           <button
             onClick={handleEnd}

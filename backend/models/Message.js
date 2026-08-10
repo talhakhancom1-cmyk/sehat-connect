@@ -40,12 +40,24 @@ const Message = sequelize.define('Message', {
     type: DataTypes.STRING
   },
   type: {
-    type: DataTypes.ENUM('text', 'attachment', 'audio', 'system', 'clinical_note'),
+    type: DataTypes.ENUM('text', 'attachment', 'audio', 'system', 'clinical_note', 'call'),
     defaultValue: 'text'
   },
   message_type: {
-    type: DataTypes.ENUM('text', 'attachment', 'audio', 'system', 'clinical_note'),
+    type: DataTypes.ENUM('text', 'attachment', 'audio', 'system', 'clinical_note', 'call'),
     defaultValue: 'text'
+  },
+  call_direction: {
+    type: DataTypes.STRING
+  },
+  call_status: {
+    type: DataTypes.STRING
+  },
+  call_duration: {
+    type: DataTypes.INTEGER
+  },
+  call_type: {
+    type: DataTypes.STRING
   },
   client_message_id: {
     type: DataTypes.STRING

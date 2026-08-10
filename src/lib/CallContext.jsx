@@ -15,7 +15,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getCallSocket, initiateCall, acceptCall as socketAcceptCall, declineCall as socketDeclineCall, cancelCall, endCall as socketEndCall } from '@/lib/callSocket';
-import { otherParty } from '@/lib/conversations';
+import { otherParty, logCall } from '@/lib/conversations';
 import { createNotification } from '@/lib/notifications';
 
 const CallContext = createContext(null);
@@ -116,7 +116,21 @@ export function CallProvider({ children }) {
         role: 'caller',
         remoteUserId: otherUser.id,
         video: !!opts.video,
+        conversationId: conversation.id,
+        otherName: otherUser.name || otherUser.display_name || 'User',
+        callType,
+        startedAt: Date.now(),
       });
+      // Log the call start in the chat thread.
+      logCall(conversation.id, {
+        call_id: res.call_id,
+        call_type: callType,
+        direction: 'outgoing',
+        status: 'initiated',
+        receiver_id: otherUser.id,
+        receiver_name: otherUser.name || otherUser.display_name,
+        sender_name: currentUser?.display_name || currentUser?.full_name,
+      }).catch(() => {});
       // Push notification so the callee sees it even if offline.
       createNotification(otherUser.id, 'chat',
         `📞 Incoming ${callType} call from ${currentUser?.display_name || currentUser?.full_name || 'User'}`,
@@ -147,6 +161,9 @@ export function CallProvider({ children }) {
         role: 'callee',
         remoteUserId: incoming.remoteUserId,
         video: incoming.call_type === 'video',
+        conversationId: incoming.conversation_id,
+        callType: incoming.call_type || 'audio',
+        startedAt: Date.now(),
       });
       setIncomingCall(null);
     } catch (e) {
@@ -165,6 +182,15 @@ export function CallProvider({ children }) {
     if (!socket) return;
     try {
       await socketDeclineCall(socket, incoming.callId);
+      // Log the declined call.
+      if (incoming.conversation_id) {
+        logCall(incoming.conversation_id, {
+          call_id: incoming.callId,
+          call_type: incoming.call_type || 'audio',
+          direction: 'incoming',
+          status: 'declined',
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error('declineCall failed:', e);
     }
@@ -178,6 +204,17 @@ export function CallProvider({ children }) {
     if (socket) {
       try { await socketEndCall(socket, active.callId); } catch { /* best-effort */ }
     }
+    // Log the call end with duration.
+    if (active.conversationId) {
+      const duration = active.startedAt ? Math.floor((Date.now() - active.startedAt) / 1000) : 0;
+      logCall(active.conversationId, {
+        call_id: active.callId,
+        call_type: active.callType || 'audio',
+        direction: active.role === 'caller' ? 'outgoing' : 'incoming',
+        status: 'ended',
+        duration,
+      }).catch(() => {});
+    }
     setActiveCall(null);
   }, []);
 
@@ -188,6 +225,15 @@ export function CallProvider({ children }) {
     const socket = getCallSocket();
     if (socket) {
       try { await cancelCall(socket, active.callId); } catch { /* best-effort */ }
+    }
+    // Log the missed/cancelled call.
+    if (active.conversationId) {
+      logCall(active.conversationId, {
+        call_id: active.callId,
+        call_type: active.callType || 'audio',
+        direction: 'outgoing',
+        status: 'missed',
+      }).catch(() => {});
     }
     setActiveCall(null);
   }, []);
