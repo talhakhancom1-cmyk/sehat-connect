@@ -46,8 +46,34 @@ function requireAdmin() {
   return requireRole(['clinic_admin', 'support_agent', 'compliance_auditor', 'super_admin']);
 }
 
+// Require a specific granular permission (stored in user.permissions JSONB).
+// Super admins bypass the check — they have all permissions implicitly.
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    // Super admins have all permissions
+    if (req.user.role === 'super_admin') return next();
+    // Check the permissions JSON
+    const perms = req.user.permissions || {};
+    if (!perms[permission]) {
+      return res.status(403).json({ error: `Missing permission: ${permission}` });
+    }
+    next();
+  };
+}
+
+// Check if the current user is a full admin (super_admin or clinic_admin)
+// vs a support agent with limited permissions.
+function isFullAdmin(user) {
+  return user.role === 'super_admin' || user.role === 'clinic_admin';
+}
+
 module.exports = {
   authenticate,
   requireRole,
-  requireAdmin
+  requireAdmin,
+  requirePermission,
+  isFullAdmin
 };

@@ -63,10 +63,31 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+
+      // Detect impersonation from the JWT token
+      const token = localStorage.getItem('ehc_token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.impersonating) {
+            currentUser._impersonating = true;
+            currentUser._admin_id = payload.admin_id;
+            currentUser._admin_email = payload.admin_email;
+            currentUser._admin_name = payload.admin_name || payload.admin_email;
+          }
+        } catch { /* not a valid JWT or not impersonating */ }
+      }
+
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
+
+      // Force password change if required (admin reset)
+      if (currentUser.must_change_password && !window.location.pathname.startsWith('/force-change-password')) {
+        window.location.href = '/force-change-password';
+        return;
+      }
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);

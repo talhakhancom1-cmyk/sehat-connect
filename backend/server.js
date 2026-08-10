@@ -135,6 +135,28 @@ const migrateMissingColumns = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
     `CREATE INDEX IF NOT EXISTS idx_otp_codes_email ON otp_codes(email);`,
+    // must_change_password column on users
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;`,
+    // permissions JSONB column on users (for support role granular permissions)
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{}';`,
+    // Audit logs table
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      actor_id UUID NOT NULL,
+      actor_email VARCHAR(255),
+      actor_role VARCHAR(50) NOT NULL,
+      action VARCHAR(100) NOT NULL,
+      target_id UUID,
+      target_email VARCHAR(255),
+      target_type VARCHAR(50) DEFAULT 'user',
+      details JSONB DEFAULT '{}',
+      ip_address VARCHAR(45),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);`,
   ];
   for (const sql of statements) {
     try {

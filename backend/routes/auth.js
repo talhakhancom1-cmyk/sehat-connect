@@ -357,6 +357,55 @@ router.post('/change-password', async (req, res) => {
   }
 });
 
+// POST /api/auth/force-change-password
+// Used when must_change_password is true — user must set a new password
+// before they can access anything else. Requires authentication.
+router.post('/force-change-password', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const { newPassword } = req.body || {};
+    if (!newPassword) {
+      return res.status(400).json({ error: 'New password is required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!user.must_change_password) {
+      return res.status(400).json({ error: 'Password change not required' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    await user.update({
+      password_hash,
+      must_change_password: false,
+    });
+
+    // Revoke all other sessions (keep current one)
+    if (Session) {
+      await Session.update(
+        { is_revoked: true, revoked_at: new Date() },
+        { where: { user_id: user.id, is_revoked: false, token_jti: { [require('sequelize').Op.ne]: decoded.jti } } }
+      );
+    }
+
+    res.json({ success: true, message: 'Password changed successfully. You can now access your account.' });
+  } catch (error) {
+    console.error('Force change password error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/auth/verify-reset-token
 // Checks if a reset token is valid (used by frontend before showing reset form)
 router.post('/verify-reset-token', async (req, res) => {
@@ -477,6 +526,179 @@ router.post('/verify-otp', async (req, res) => {
     res.json({ success: true, message: 'OTP verified successfully' });
   } catch (error) {
     console.error('Verify OTP error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---- Impersonation endpoints ----
+// Admin/Support can start an impersonation session as any user.
+// The impersonation token contains both the admin's ID and the target's ID,
+// so we can always trace who did what.
+
+// POST /api/auth/impersonate/:userId
+// Start impersonating a user. Requires can_impersonate permission.
+router.post('/impersonate/:userId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const adminToken = authHeader.split(' ')[1];
+    const adminDecoded = jwt.verify(adminToken, JWT_SECRET);
+    const admin = await User.findByPk(adminDecoded.id);
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin not found' });
+    }
+
+    // Check permission (super_admin bypasses, others need can_impersonate)
+    const { isFullAdmin } = require('../middleware/auth');
+    if (!isFullAdmin(admin) && !(admin.permissions || {}).can_impersonate) {
+      return res.status(403).json({ error: 'You do not have permission to impersonate users' });
+    }
+
+    // Can't impersonate other admins (prevents privilege escalation)
+    const target = await User.findByPk(req.params.userId);
+    if (!target) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+    if (isFullAdmin(target) && !admin.isSuperAdmin()) {
+      return res.status(403).json({ error: 'Cannot impersonate admin accounts' });
+    }
+    if (target.id === admin.id) {
+      return res.status(400).json({ error: 'Cannot impersonate yourself' });
+    }
+
+    // Create an impersonation token that contains both admin and target IDs
+    const impJti = uuidv4();
+    const impToken = jwt.sign(
+      {
+        id: target.id,
+        email: target.email,
+        role: target.role,
+        app_role: target.app_role,
+        jti: impJti,
+        impersonating: true,
+        admin_id: admin.id,
+        admin_email: admin.email,
+        admin_role: admin.role,
+      },
+      JWT_SECRET,
+      { expiresIn: '2h' } // impersonation sessions expire after 2 hours max
+    );
+
+    // Create a session for the impersonation
+    await createSession(target, impToken, req);
+
+    // Log the impersonation start
+    const { AuditLog } = require('../models');
+    await AuditLog.log({ user: admin, headers: req.headers, ip: req.ip, connection: req.connection },
+      'impersonation_start',
+      { id: target.id, email: target.email },
+      { session_jti: impJti }
+    );
+
+    res.json({
+      token: impToken,
+      user: target,
+      impersonating: true,
+      admin_id: admin.id,
+      admin_email: admin.email,
+      admin_name: admin.display_name || admin.email,
+    });
+  } catch (error) {
+    console.error('Impersonation start error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/auth/end-impersonation
+// End an impersonation session and restore the admin's original token.
+// The admin's original token must be passed in the body.
+router.post('/end-impersonation', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const impToken = authHeader.split(' ')[1];
+    const decoded = jwt.verify(impToken, JWT_SECRET);
+
+    if (!decoded.impersonating) {
+      return res.status(400).json({ error: 'Not an impersonation session' });
+    }
+
+    // Log the impersonation end
+    const { AuditLog } = require('../models');
+    const adminUser = { id: decoded.admin_id, email: decoded.admin_email, role: decoded.admin_role };
+    await AuditLog.log({ user: adminUser, headers: req.headers, ip: req.ip, connection: req.connection },
+      'impersonation_end',
+      { id: decoded.id, email: decoded.email },
+      { session_jti: decoded.jti }
+    );
+
+    // Revoke the impersonation session
+    if (Session) {
+      await Session.update(
+        { is_revoked: true, revoked_at: new Date() },
+        { where: { token_jti: decoded.jti, is_revoked: false } }
+      );
+    }
+
+    // The admin's original token is passed in the body
+    const { adminToken } = req.body || {};
+    if (!adminToken) {
+      return res.json({ success: true, message: 'Impersonation ended. Please log in again as admin.' });
+    }
+
+    // Verify the admin token is still valid
+    const adminDecoded = jwt.verify(adminToken, JWT_SECRET);
+    const admin = await User.findByPk(adminDecoded.id);
+    if (!admin) {
+      return res.json({ success: true, message: 'Impersonation ended. Admin session expired.' });
+    }
+
+    res.json({
+      success: true,
+      token: adminToken,
+      user: admin,
+      message: 'Impersonation ended. Restored to admin session.',
+    });
+  } catch (error) {
+    console.error('End impersonation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/auth/audit-logs — get all audit logs (admin only)
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const requester = await User.findByPk(decoded.id);
+    if (!requester || !requester.isAdmin()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { AuditLog } = require('../models');
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const offset = parseInt(req.query.offset) || 0;
+    const where = {};
+    if (req.query.action) where.action = req.query.action;
+    if (req.query.actor_id) where.actor_id = req.query.actor_id;
+    if (req.query.target_id) where.target_id = req.query.target_id;
+
+    const logs = await AuditLog.findAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit,
+      offset,
+    });
+    res.json(logs);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

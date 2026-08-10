@@ -1,19 +1,40 @@
-Mobile responsive fixes for key screens
+Admin features: password reset, impersonation, support role, audit logging
 
-#3 Mobile responsive design:
-- BookingModal: stat badges grid now collapses to 2 cols on mobile
-  (was grid-cols-4, now grid-cols-2 sm:grid-cols-4)
-- EditProfile: city/country and emergency contact grids now
-  collapse to 1 col on mobile (was grid-cols-2, now
-  grid-cols-1 sm:grid-cols-2)
-- VideoCall: control button padding reduced on mobile (p-3.5 sm:p-4),
-  icon sizes responsive (w-5 sm:w-6), end call button smaller on
-  mobile (px-6 py-3 sm:px-8 sm:py-4)
-- AudioCall: avatar smaller on mobile (w-20 sm:w-24), button padding
-  and icon sizes responsive, end call button responsive
-- index.css: added overflow-x: hidden on body to prevent horizontal
-  scroll, max-width: 100% on img/video/canvas/svg, minimum touch
-  target size on mobile
+#1 Admin Password Reset + Force Change:
+- New AuditLog model with actor, action, target, details, IP
+- Added must_change_password boolean + permissions JSONB to User model
+- POST /api/users/:id/reset-password: generates 16-char temp password,
+  hashes it, sets must_change_password=true, emails via SMTP, revokes
+  all sessions, logs to audit trail
+- POST /api/auth/force-change-password: user must set new password
+  before accessing anything else
+- AuthContext redirects to /force-change-password if flag is true
+- New ForceChangePassword page
+
+#3 Support Role + Permissions:
+- requirePermission() middleware checks user.permissions JSONB
+- Super_admin bypasses all permission checks
+- Permission keys: can_view_users, can_reset_passwords, can_impersonate,
+  can_view_tickets, can_view_medical_data
+- PATCH /api/users/:id/permissions (super_admin only) to set granular
+  permissions per user
+- AdminUsers page now shows "Manage" button with password reset and
+  impersonation actions (only if user has the permission)
+
+#2 Impersonation:
+- POST /api/auth/impersonate/:userId: creates special JWT with both
+  admin_id and impersonated user info, 2-hour expiry, logs start
+- POST /api/auth/end-impersonation: restores admin token, logs end
+- GET /api/auth/audit-logs: admin-only audit log viewer
+- ImpersonationBanner component: persistent yellow banner at top
+  showing "Impersonating [User] — Admin: [Admin]" with End button
+- Cannot impersonate other admins (prevents privilege escalation)
+- Cannot impersonate yourself
+- Medical data visibility: Support role never sees medical data even
+  during impersonation (enforced at route level via can_view_medical_data
+  permission). Full admin can see medical data (with audit logging).
+- Admin's original token saved in localStorage as ehc_admin_token
+  and restored when impersonation ends
 
 Generated with [Devin](https://devin.ai)
 
