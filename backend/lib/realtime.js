@@ -135,7 +135,9 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
     // ---- Call signaling (WebRTC) ----
     socket.on('call:signal', ({ call_id, to_user_id, signal_type, payload } = {}) => {
       if (!call_id || !to_user_id) return;
+      console.log(`[realtime] call:signal ${signal_type} from ${userId} to ${to_user_id}`);
       const targetSockets = getSocketIdsForUser(to_user_id);
+      console.log(`[realtime] target ${to_user_id} has ${targetSockets.length} socket(s)`);
       targetSockets.forEach((sid) => {
         io.to(sid).emit('call:signal', {
           call_id,

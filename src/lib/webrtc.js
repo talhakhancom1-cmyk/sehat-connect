@@ -63,6 +63,7 @@ export class WebRTCCall {
     // Route incoming remote tracks to a MediaStream the UI can render.
     this.remoteStream = new MediaStream();
     this.pc.ontrack = (event) => {
+      console.log('[WebRTC:pc] ontrack', event.track.kind, event.streams.length);
       event.streams[0]?.getTracks().forEach((t) => this.remoteStream.addTrack(t));
       // Also handle single-track events (some browsers don't set event.streams)
       if (!event.streams[0]) this.remoteStream.addTrack(event.track);
@@ -79,6 +80,7 @@ export class WebRTCCall {
     // Connection state changes for UI feedback + reconnection handling.
     this.pc.oniceconnectionstatechange = () => {
       const state = this.pc.iceConnectionState;
+      console.log('[WebRTC:pc] ICE state:', state);
       this.onStateChange?.({ ice: state });
       if (state === 'failed') {
         // Attempt ICE restart once before giving up.
@@ -86,7 +88,11 @@ export class WebRTCCall {
       }
     };
     this.pc.onconnectionstatechange = () => {
+      console.log('[WebRTC:pc] connection state:', this.pc.connectionState);
       this.onStateChange?.({ connection: this.pc.connectionState });
+    };
+    this.pc.onsignalingstatechange = () => {
+      console.log('[WebRTC:pc] signaling state:', this.pc.signalingState);
     };
 
     return this.localStream;
@@ -95,33 +101,41 @@ export class WebRTCCall {
   /** Caller creates the offer. Returns the SDP offer object. */
   async createOffer() {
     if (!this.pc) throw new Error('Peer connection not started');
+    console.log('[WebRTC:pc] creating offer');
     const offer = await this.pc.createOffer({
       offerToReceiveAudio: true,
       offerToReceiveVideo: this.video,
       iceRestart: false,
     });
     await this.pc.setLocalDescription(offer);
+    console.log('[WebRTC:pc] local description set (offer)');
     return offer;
   }
 
   /** Callee receives the offer and prepares an answer. */
   async setRemoteOffer(offerSdp) {
     if (!this.pc) throw new Error('Peer connection not started');
+    console.log('[WebRTC:pc] setting remote offer');
     await this.pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+    console.log('[WebRTC:pc] remote description set (offer)');
   }
 
   /** Callee creates the answer after accepting the offer. Returns SDP answer. */
   async createAnswer() {
     if (!this.pc) throw new Error('Peer connection not started');
+    console.log('[WebRTC:pc] creating answer');
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
+    console.log('[WebRTC:pc] local description set (answer)');
     return answer;
   }
 
   /** Caller receives the callee's answer. */
   async setRemoteAnswer(answerSdp) {
     if (!this.pc) throw new Error('Peer connection not started');
+    console.log('[WebRTC:pc] setting remote answer');
     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+    console.log('[WebRTC:pc] remote description set (answer)');
   }
 
   /** Either side receives a remote ICE candidate from signaling. */
