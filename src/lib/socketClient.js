@@ -28,11 +28,15 @@ function getToken() {
  */
 export function getSocket() {
   const token = getToken();
-  if (!token) return null;
+  if (!token) {
+    console.warn('[socketClient] getSocket: no token in localStorage');
+    return null;
+  }
 
   if (socket && socket.connected) return socket;
 
   if (!socket) {
+    console.log('[socketClient] creating new socket to', SOCKET_ORIGIN, 'path /ws');
     socket = io(SOCKET_ORIGIN, {
       path: '/ws',
       auth: { token },
@@ -40,11 +44,14 @@ export function getSocket() {
       autoConnect: true,
       reconnection: true,
     });
-    socket.on('connect_error', () => {
-      // Non-fatal — chat/calls fall back to polling if the socket can't connect.
+    socket.on('connect', () => console.log('[socketClient] connected, id=', socket.id));
+    socket.on('connect_error', (err) => {
+      console.warn('[socketClient] connect_error:', err.message);
     });
+    socket.on('disconnect', (reason) => console.warn('[socketClient] disconnected:', reason));
   } else if (!socket.connected) {
     // Token may have changed (e.g. re-login) — refresh auth before reconnecting.
+    console.log('[socketClient] reconnecting existing socket');
     socket.auth = { token };
     socket.connect();
   }

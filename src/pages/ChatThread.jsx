@@ -153,6 +153,7 @@ export default function ChatThread() {
   };
 
   const handleStartCall = async () => {
+    console.log('[ChatThread] handleStartCall clicked', { callCtx: !!callCtx, conversation: !!conversation, other, user: user?.id });
     if (!callCtx) {
       alert('Call system not available. Please refresh the page.');
       return;

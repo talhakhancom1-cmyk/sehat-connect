@@ -40,8 +40,10 @@ export function CallProvider({ children }) {
     if (!socket) return;
 
     const onRinging = ({ call_id, from_user_id, call_type, conversation_id, appointment_id }) => {
+      console.log('[CallContext] call:ringing received', { call_id, from_user_id, call_type, conversation_id });
       // Skip if we're already in a call or already showing an incoming call.
       if (activeCallRef.current || incomingCallRef.current || initiatingRef.current) {
+        console.log('[CallContext] auto-declining (busy)');
         // Auto-decline — we're busy.
         socketDeclineCall(socket, call_id).catch(() => {});
         return;
@@ -79,28 +81,36 @@ export function CallProvider({ children }) {
 
   // Start an outgoing call.
   const startCall = useCallback(async (conversation, otherUser, currentUser, opts = {}) => {
+    console.log('[CallContext] startCall called', { conversation: !!conversation, otherUser, currentUser: currentUser?.id, opts });
     if (!conversation || !currentUser?.id || !otherUser?.id) {
+      console.warn('[CallContext] startCall early return: missing data', { conversation, otherUser, currentUser });
       setCallError('Could not start call: missing conversation or user info.');
       return false;
     }
-    if (initiatingRef.current || activeCallRef.current) return false;
+    if (initiatingRef.current || activeCallRef.current) {
+      console.warn('[CallContext] startCall early return: already in a call or initiating', { initiating: initiatingRef.current, active: !!activeCallRef.current });
+      return false;
+    }
     initiatingRef.current = true;
     setCallError(null);
     setIncomingCall(null);
     try {
       const socket = getCallSocket();
+      console.log('[CallContext] socket from getCallSocket:', socket ? `connected=${socket.connected} id=${socket.id}` : 'NULL');
       if (!socket) {
         setCallError('Real-time connection not available. Please refresh and try again.');
         initiatingRef.current = false;
         return false;
       }
       const callType = opts.video ? 'video' : 'audio';
+      console.log('[CallContext] initiating call', { to_user_id: otherUser.id, call_type: callType, conversation_id: conversation.id });
       const res = await initiateCall(socket, {
         to_user_id: otherUser.id,
         call_type: callType,
         conversation_id: conversation.id,
         appointment_id: conversation.appointment_id,
       });
+      console.log('[CallContext] initiateCall response:', res);
       setActiveCall({
         callId: res.call_id,
         role: 'caller',

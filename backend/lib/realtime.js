@@ -179,6 +179,7 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
     socket.on('call:initiate', async (payload, ack) => {
       try {
         const { to_user_id, call_type = 'audio', conversation_id, appointment_id } = payload || {};
+        console.log(`[realtime] call:initiate from ${userId} to ${to_user_id} type=${call_type}`);
         if (!to_user_id) return ack && ack({ error: 'to_user_id is required' });
 
         const room = await CallRoom.create({
@@ -195,6 +196,7 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
 
         // Ring the target user (only if they have sockets online).
         const targetSockets = getSocketIdsForUser(to_user_id);
+        console.log(`[realtime] target ${to_user_id} has ${targetSockets.length} socket(s) online`);
         targetSockets.forEach((sid) => {
           io.to(sid).emit('call:ringing', {
             call_id: room.id,
