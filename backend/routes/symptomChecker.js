@@ -3,17 +3,18 @@ const { SymptomSession, Doctor, Schedule, Appointment } = require('../models');
 const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { sanitizeError } = require('../lib/validate');
-const { moderateContent, chatCompletion } = require('../lib/openai');
+const { moderateContent, chatCompletion, getAiConfig } = require('../lib/openai');
 
 const router = express.Router();
 
-// Rate limiting: max 10 symptom checks per user per day
+// Rate limiting: configurable via admin panel (default 10 per user per day)
 const sessionCounts = new Map(); // Simple in-memory rate limiter
-function checkRateLimit(userId) {
+async function checkRateLimit(userId) {
+  const { dailyCheckLimit } = await getAiConfig();
   const today = new Date().toDateString();
   const key = `${userId}:${today}`;
   const count = sessionCounts.get(key) || 0;
-  if (count >= 10) return false;
+  if (count >= dailyCheckLimit) return false;
   sessionCounts.set(key, count + 1);
   // Clean up old entries
   for (const [k] of sessionCounts) {
@@ -25,8 +26,14 @@ function checkRateLimit(userId) {
 // POST /api/symptom-checker/start — start a new symptom checker session
 router.post('/start', authenticate, async (req, res) => {
   try {
-    if (!checkRateLimit(req.user.id)) {
-      return res.status(429).json({ error: 'You have reached the daily limit of 10 symptom checks. Please try again tomorrow.' });
+    // Check if symptom checker is enabled
+    const { symptomCheckerEnabled, dailyCheckLimit } = await getAiConfig();
+    if (!symptomCheckerEnabled) {
+      return res.status(503).json({ error: 'The symptom checker is currently disabled. Please consult a doctor directly.' });
+    }
+
+    if (!(await checkRateLimit(req.user.id))) {
+      return res.status(429).json({ error: `You have reached the daily limit of ${dailyCheckLimit} symptom checks. Please try again tomorrow.` });
     }
 
     const { message } = req.body;
@@ -97,6 +104,10 @@ router.post('/start', authenticate, async (req, res) => {
 // POST /api/symptom-checker/:sessionId/message — continue a session
 router.post('/:sessionId/message', authenticate, async (req, res) => {
   try {
+    const { symptomCheckerEnabled } = await getAiConfig();
+    if (!symptomCheckerEnabled) {
+      return res.status(503).json({ error: 'The symptom checker is currently disabled.' });
+    }
     const { message } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Please enter a message.' });

@@ -49,6 +49,7 @@ import AdminCountryConfig from '@/pages/AdminCountryConfig';
 import AdminPixels from '@/pages/AdminPixels';
 import AdminApiKeys from '@/pages/AdminApiKeys';
 import AdminEmailConfig from '@/pages/AdminEmailConfig';
+import AdminAiConfig from '@/pages/AdminAiConfig';
 import PixelTracker from '@/components/PixelTracker';
 import NotificationsPage from '@/pages/NotificationsPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -141,6 +142,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/pixels" element={<AdminPixels />} />
         <Route path="/admin/api-keys" element={<AdminApiKeys />} />
         <Route path="/admin/email" element={<AdminEmailConfig />} />
+        <Route path="/admin/ai-config" element={<AdminAiConfig />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />

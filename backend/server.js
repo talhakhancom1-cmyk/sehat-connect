@@ -423,6 +423,7 @@ const encountersListRoutes = require('./routes/encountersList');
 const socketEvents = require('./lib/socketEvents');
 const apiKeyRoutes = require('./routes/apiKeys');
 const emailConfigRoutes = require('./routes/emailConfig');
+const aiConfigRoutes = require('./routes/aiConfig');
 const internalRoutes = require('./routes/internal');
 
 // Use routes
@@ -509,6 +510,7 @@ app.use('/api/audit-events', auditRoutes);
 socketEvents.attachPlaceholder(app);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/email-config', emailConfigRoutes);
+app.use('/api/ai-config', aiConfigRoutes);
 
 // Versioned v1 API surface (canonical per Section 10)
 app.use('/api/v1/appointments', appointmentRoutes);
@@ -554,6 +556,7 @@ app.use('/api/v1/encounters', encountersListRoutes);
 app.use('/api/v1/audit-events', auditRoutes);
 app.use('/api/v1/api-keys', apiKeyRoutes);
 app.use('/api/v1/email-config', emailConfigRoutes);
+app.use('/api/v1/ai-config', aiConfigRoutes);
 
 // Health check endpoint
 const healthHandler = async (req, res) => {
