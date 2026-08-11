@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toUserError } from '@/lib/userError';
+import { validateEmail, validateRequired, validateLength } from '@/lib/validate';
 
 const roles = [
   { value: 'member', label: 'Member' },
@@ -21,6 +22,11 @@ export default function HouseholdMemberForm({ householdId, householdName, addedB
   const [err, setErr] = useState(null);
 
   const submit = async () => {
+    // Frontend validation — mirror backend rules.
+    const nameErr = validateRequired(name, 'Display name') || validateLength(name.trim(), 2, 100, 'Display name');
+    if (nameErr) { setErr(nameErr); return; }
+    const emailErr = validateEmail(email.trim());
+    if (emailErr) { setErr(emailErr); return; }
     if (!email.trim() && !name.trim()) return;
     setSaving(true); setErr(null);
     try {

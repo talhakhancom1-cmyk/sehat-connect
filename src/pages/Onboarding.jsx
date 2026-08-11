@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { toUserError } from '@/lib/userError';
+import { validatePhone, validateDateOfBirth, validateNumericRange } from '@/lib/validate';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
@@ -135,6 +136,20 @@ export default function Onboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Frontend validation — mirror backend rules. Show errors via toast.
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) { toast({ title: 'Validation error', description: phoneErr, variant: 'destructive' }); return; }
+    if (role === 'patient') {
+      const dobErr = validateDateOfBirth(dateOfBirth);
+      if (dobErr) { toast({ title: 'Validation error', description: dobErr, variant: 'destructive' }); return; }
+      const ageErr = validateNumericRange(age, 0, 150, 'Age');
+      if (ageErr) { toast({ title: 'Validation error', description: ageErr, variant: 'destructive' }); return; }
+    } else {
+      const feeErr = validateNumericRange(consultationFee, 0, 1000000, 'Consultation fee');
+      if (feeErr) { toast({ title: 'Validation error', description: feeErr, variant: 'destructive' }); return; }
+      const expErr = validateNumericRange(experienceYears, 0, 70, 'Experience years');
+      if (expErr) { toast({ title: 'Validation error', description: expErr, variant: 'destructive' }); return; }
+    }
     setLoading(true);
     try {
       const payload = {

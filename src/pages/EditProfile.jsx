@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Camera, Loader2, User as UserIcon, KeyRound, ShieldAlert } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
 import { toUserError } from '@/lib/userError';
+import { validatePhone } from '@/lib/validate';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
@@ -108,6 +109,9 @@ export default function EditProfile() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    // Frontend validation — phone format. Show errors via toast.
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) { toast({ title: 'Validation error', description: phoneErr, variant: 'destructive' }); return; }
     setSaving(true);
     try {
       await base44.auth.updateMe({

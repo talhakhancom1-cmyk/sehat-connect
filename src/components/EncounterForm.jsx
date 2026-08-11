@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toUserError } from '@/lib/userError';
+import { validateRequired, validateLength } from '@/lib/validate';
 
 // Converts any date-like value into a valid ISO 8601 string for the backend.
 // Returns null if the value cannot be parsed, so the caller can fall back.
@@ -41,6 +42,12 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
   const handleSave = async () => {
     if (saving) return;
     setError('');
+
+    // Frontend validation — mirror backend rules.
+    const complaintErr = validateRequired(form.chief_complaint, 'Chief complaint') || validateLength(form.chief_complaint, 0, 500, 'Chief complaint');
+    if (complaintErr) { setError(complaintErr); return; }
+    const diagnosisErr = validateLength(form.diagnosis, 0, 2000, 'Diagnosis');
+    if (diagnosisErr) { setError(diagnosisErr); return; }
 
     // Validate and normalize the encounter date before anything else.
     // appointment.appointment_date may be an ISO string, a "YYYY-MM-DD" string,

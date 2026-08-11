@@ -9,6 +9,7 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import { isAdmin, isDoctor } from "@/lib/useRole";
+import { validateEmail, validateRequired } from "@/lib/validate";
 
 function portalFor(user) {
   if (!user) return '/';
@@ -29,6 +30,11 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    // Frontend validation before any API call.
+    const emailErr = validateEmail(email);
+    if (emailErr) { setError(emailErr); return; }
+    const pwErr = validateRequired(password, "Password");
+    if (pwErr) { setError(pwErr); return; }
     setLoading(true);
 
     if (isTestMode) {

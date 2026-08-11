@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, AlertTriangle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import { validatePassword } from "@/lib/validate";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -19,6 +20,9 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    // Frontend validation before any API call.
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) { setError(pwErr); return; }
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return;

@@ -11,6 +11,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 import { toUserError } from "@/lib/userError";
+import { validateEmail, validatePassword, validateRequired, validateLength } from "@/lib/validate";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -92,10 +93,13 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
+    // Frontend validation — mirror backend rules.
+    const nameErr = validateRequired(fullName, "Full name") || validateLength(fullName.trim(), 2, 100, "Full name");
+    if (nameErr) { setError(nameErr); return; }
+    const emailErr = validateEmail(email);
+    if (emailErr) { setError(emailErr); return; }
+    const pwErr = validatePassword(password);
+    if (pwErr) { setError(pwErr); return; }
 
     // If OTP is required, send OTP and switch to OTP step
     if (otpRequired && !otpStep) {

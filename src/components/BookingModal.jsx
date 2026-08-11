@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import { X, Users, Briefcase, MessageSquare, Star, Video, Phone, Building2, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { validateFutureDate, validateRequired } from '@/lib/validate';
 
 const dayMap = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat' };
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -50,6 +51,7 @@ export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
   const [schedule, setSchedule] = useState(null);
   const [bookedSlots, setBookedSlots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const dates = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
@@ -142,7 +144,12 @@ export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
   ];
 
   const handleConfirm = () => {
-    if (!selectedDate || !selectedSlot) return;
+    setError('');
+    // Frontend validation before booking.
+    const dateErr = validateFutureDate(selectedDate, 'Appointment date');
+    if (dateErr) { setError(dateErr); return; }
+    const slotErr = validateRequired(selectedSlot, 'Time slot');
+    if (slotErr) { setError(slotErr); return; }
     onConfirm({
       appointment_date: selectedDate,
       time_slot: selectedSlot,
@@ -284,6 +291,10 @@ export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-t border-red-100">{error}</div>
+        )}
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-card border-t border-border p-4 flex items-center justify-between gap-3">

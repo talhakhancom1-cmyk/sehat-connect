@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toUserError } from '@/lib/userError';
+import { validateRequired, validateLength } from '@/lib/validate';
 
 // Doctor creates a new prescription. `patients` is a de-duplicated list of
 // { patient_id, patient_name } derived from the doctor's appointments.
@@ -27,6 +28,11 @@ export default function PrescriptionForm({ patients, doctor, onClose, onCreated 
     if (!canSave) return;
     setSaving(true);
     setError('');
+    // Frontend validation — mirror backend rules.
+    const diagnosisErr = validateRequired(diagnosis, 'Diagnosis') || validateLength(diagnosis, 0, 2000, 'Diagnosis');
+    if (diagnosisErr) { setError(diagnosisErr); setSaving(false); return; }
+    const medNameErr = meds.some(m => m.name && !m.name.trim()) ? 'Medication name cannot be empty' : null;
+    if (medNameErr) { setError(medNameErr); setSaving(false); return; }
     try {
       await onCreated({
         patient_id: patientId,
