@@ -24,6 +24,7 @@ export default function Appointments() {
   const gate = useAppointmentCallGate();
   const [payAppt, setPayAppt] = useState(null);
   const [sortDesc, setSortDesc] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => { if (user?.id) load(); }, [sortDesc, user?.id]);
 
@@ -36,10 +37,19 @@ export default function Appointments() {
   };
 
   const handleCancel = async (appt) => {
+    if (cancellingId) return;
     if (!window.confirm('Cancel this appointment? This action cannot be undone.')) return;
-    await base44.entities.Appointment.update(appt.id, { status: 'cancelled' });
-    toast({ title: 'Appointment cancelled', description: `Your appointment with ${appt.doctor_name} has been cancelled.` });
-    load();
+    setCancellingId(appt.id);
+    try {
+      await base44.entities.Appointment.update(appt.id, { status: 'cancelled' });
+      toast({ title: 'Appointment cancelled', description: `Your appointment with ${appt.doctor_name} has been cancelled.` });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Could not cancel appointment', variant: 'destructive' });
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const filtered = tab === 'all' ? appointments : appointments.filter(a => a.status === tab);
@@ -88,6 +98,7 @@ export default function Appointments() {
                 key={appt.id}
                 appointment={appt}
                 onCancel={handleCancel}
+                cancellingId={cancellingId}
                 onPay={(a) => setPayAppt(a)}
                 onVideoCall={(a) => gate.startGatedCall(a, { video: true })}
               />

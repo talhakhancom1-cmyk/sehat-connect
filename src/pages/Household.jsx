@@ -22,6 +22,11 @@ export default function Household() {
   const [name, setName] = useState('');
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [showDelegationForm, setShowDelegationForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [addingMember, setAddingMember] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+  const [granting, setGranting] = useState(false);
+  const [revokingId, setRevokingId] = useState(null);
 
   useEffect(() => { if (user?.id) load(); }, [user?.id]);
 
@@ -41,7 +46,8 @@ export default function Household() {
   };
 
   const createHousehold = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || creating) return;
+    setCreating(true);
     try {
       const h = await base44.entities.Household.create({ name: name.trim(), head_user_id: user.id, head_name: user.full_name, member_ids: [user.id], status: 'active' });
       await base44.entities.HouseholdMember.create({ household_id: h.id, household_name: h.name, user_id: user.id, user_name: user.full_name, user_email: user.email, role: 'head', added_by: user.id, added_at: new Date().toISOString(), status: 'active' });
@@ -49,63 +55,95 @@ export default function Household() {
       setName('');
       load();
     } catch (e) { toast({ title: 'Could not create household', description: e.message, variant: 'destructive' }); }
+    finally { setCreating(false); }
   };
 
   const addMember = async ({ email, name: memberName, role, relationship, is_minor }) => {
-    if (!household) return;
-    let userId = email;
-    if (email) {
-      try {
-        const invited = await base44.users.inviteUser(email, 'user');
-        userId = invited?.id || invited || email;
-      } catch (e) {
-        // If invite fails (e.g. already registered), continue with email as the reference
-        userId = email;
+    if (!household || addingMember) return;
+    setAddingMember(true);
+    try {
+      let userId = email;
+      if (email) {
+        try {
+          const invited = await base44.users.inviteUser(email, 'user');
+          userId = invited?.id || invited || email;
+        } catch (e) {
+          // If invite fails (e.g. already registered), continue with email as the reference
+          userId = email;
+        }
       }
+      await base44.entities.HouseholdMember.create({
+        household_id: household.id, household_name: household.name,
+        user_id: userId, user_name: memberName, user_email: email || undefined,
+        role, relationship, is_minor,
+        added_by: user.id, added_at: new Date().toISOString(), status: 'active',
+      });
+      await base44.entities.Household.update(household.id, { member_ids: [...new Set([...(household.member_ids || []), userId])] });
+      await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'household_invite', target_type: 'Household', target_id: household.id, patient_id: user.id, detail: `Invited ${memberName || email}` });
+      toast({ title: 'Member added' });
+      setShowMemberForm(false);
+      load();
+    } catch (e) {
+      toast({ title: 'Could not add member', description: e.message, variant: 'destructive' });
+    } finally {
+      setAddingMember(false);
     }
-    await base44.entities.HouseholdMember.create({
-      household_id: household.id, household_name: household.name,
-      user_id: userId, user_name: memberName, user_email: email || undefined,
-      role, relationship, is_minor,
-      added_by: user.id, added_at: new Date().toISOString(), status: 'active',
-    });
-    await base44.entities.Household.update(household.id, { member_ids: [...new Set([...(household.member_ids || []), userId])] });
-    await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'household_invite', target_type: 'Household', target_id: household.id, patient_id: user.id, detail: `Invited ${memberName || email}` });
-    toast({ title: 'Member added' });
-    setShowMemberForm(false);
-    load();
   };
 
   const removeMember = async (m) => {
     if (m.user_id === user.id) { toast({ title: 'You cannot remove yourself', variant: 'destructive' }); return; }
+    if (removingId) return;
     if (!confirm(`Remove ${m.user_name || m.user_email}?`)) return;
-    await base44.entities.HouseholdMember.update(m.id, { status: 'removed' });
-    await base44.entities.Household.update(household.id, { member_ids: (household.member_ids || []).filter((id) => id !== m.user_id) });
-    await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'household_revoke', target_type: 'HouseholdMember', target_id: m.id, patient_id: user.id, detail: `Removed ${m.user_name || m.user_email}` });
-    toast({ title: 'Member removed' });
-    load();
+    setRemovingId(m.id);
+    try {
+      await base44.entities.HouseholdMember.update(m.id, { status: 'removed' });
+      await base44.entities.Household.update(household.id, { member_ids: (household.member_ids || []).filter((id) => id !== m.user_id) });
+      await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'household_revoke', target_type: 'HouseholdMember', target_id: m.id, patient_id: user.id, detail: `Removed ${m.user_name || m.user_email}` });
+      toast({ title: 'Member removed' });
+      load();
+    } catch (e) {
+      toast({ title: 'Could not remove member', description: e.message, variant: 'destructive' });
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   const grantDelegation = async ({ delegatee_user_id, scope, record_view_categories, expires_hours }) => {
-    const expiresAt = new Date(Date.now() + expires_hours * 3600 * 1000).toISOString();
-    const member = members.find((m) => m.user_id === delegatee_user_id);
-    await base44.entities.Delegation.create({
-      household_id: household.id, delegator_user_id: user.id, delegator_name: user.full_name,
-      delegatee_user_id, delegatee_name: member?.user_name || '',
-      scope, record_view_categories: scope === 'record_view' ? record_view_categories : [],
-      status: 'active', granted_at: new Date().toISOString(), expires_at: expiresAt,
-    });
-    await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'delegation_grant', target_type: 'Delegation', target_id: 'pending', patient_id: user.id, detail: `Granted ${scopeLabel[scope]} to ${member?.user_name || ''}` });
-    toast({ title: 'Access granted' });
-    setShowDelegationForm(false);
-    load();
+    if (granting) return;
+    setGranting(true);
+    try {
+      const expiresAt = new Date(Date.now() + expires_hours * 3600 * 1000).toISOString();
+      const member = members.find((m) => m.user_id === delegatee_user_id);
+      await base44.entities.Delegation.create({
+        household_id: household.id, delegator_user_id: user.id, delegator_name: user.full_name,
+        delegatee_user_id, delegatee_name: member?.user_name || '',
+        scope, record_view_categories: scope === 'record_view' ? record_view_categories : [],
+        status: 'active', granted_at: new Date().toISOString(), expires_at: expiresAt,
+      });
+      await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'delegation_grant', target_type: 'Delegation', target_id: 'pending', patient_id: user.id, detail: `Granted ${scopeLabel[scope]} to ${member?.user_name || ''}` });
+      toast({ title: 'Access granted' });
+      setShowDelegationForm(false);
+      load();
+    } catch (e) {
+      toast({ title: 'Could not grant access', description: e.message, variant: 'destructive' });
+    } finally {
+      setGranting(false);
+    }
   };
 
   const revokeDelegation = async (d) => {
-    await base44.entities.Delegation.update(d.id, { status: 'revoked', revoked_at: new Date().toISOString() });
-    await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'delegation_revoke', target_type: 'Delegation', target_id: d.id, patient_id: user.id, detail: `Revoked ${scopeLabel[d.scope]}` });
-    toast({ title: 'Delegation revoked' });
-    load();
+    if (revokingId) return;
+    setRevokingId(d.id);
+    try {
+      await base44.entities.Delegation.update(d.id, { status: 'revoked', revoked_at: new Date().toISOString() });
+      await base44.entities.AuditEvent.create({ actor_user_id: user.id, actor_role: 'patient', action: 'delegation_revoke', target_type: 'Delegation', target_id: d.id, patient_id: user.id, detail: `Revoked ${scopeLabel[d.scope]}` });
+      toast({ title: 'Delegation revoked' });
+      load();
+    } catch (e) {
+      toast({ title: 'Could not revoke delegation', description: e.message, variant: 'destructive' });
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   if (loading) return <Layout><div className="h-40 rounded-2xl shimmer" /></Layout>;
@@ -126,7 +164,7 @@ export default function Household() {
             <EmptyState icon={Users} title="No household yet" description="Create a household to add members and grant scoped access (booking, payments, record views)." />
             <div className="p-4 pt-0 flex items-center gap-2">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Household name (e.g. Khan Family)" className="flex-1 h-10 rounded-xl border border-input bg-background px-3 text-sm" />
-              <button onClick={createHousehold} disabled={!name.trim()} className="px-4 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"><Plus className="w-4 h-4" /> Create</button>
+              <button onClick={createHousehold} disabled={!name.trim() || creating} className="px-4 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"><Plus className="w-4 h-4" /> {creating ? 'Creating…' : 'Create'}</button>
             </div>
           </div>
         ) : (
@@ -152,7 +190,7 @@ export default function Household() {
                     </div>
                     <StatusBadge status={m.status} />
                     {m.status === 'active' && m.user_id !== user.id && (
-                      <button onClick={() => removeMember(m)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5"><Ban className="w-4 h-4" /></button>
+                      <button onClick={() => removeMember(m)} disabled={removingId === m.id} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 disabled:opacity-40"><Ban className="w-4 h-4" /></button>
                     )}
                   </div>
                 ))}
@@ -183,7 +221,7 @@ export default function Household() {
                         </p>
                       </div>
                       <StatusBadge status="active" />
-                      <button onClick={() => revokeDelegation(d)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5"><Ban className="w-4 h-4" /></button>
+                      <button onClick={() => revokeDelegation(d)} disabled={revokingId === d.id} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 disabled:opacity-40"><Ban className="w-4 h-4" /></button>
                     </div>
                   ))}
                 </div>

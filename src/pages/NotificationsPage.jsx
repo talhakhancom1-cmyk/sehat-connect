@@ -16,6 +16,7 @@ export default function NotificationsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,8 +34,16 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAll = async () => {
-    await markAllRead();
-    load();
+    if (marking) return;
+    setMarking(true);
+    try {
+      await markAllRead();
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMarking(false);
+    }
   };
 
   return (
@@ -43,8 +52,8 @@ export default function NotificationsPage() {
         {unread > 0 && (
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-muted-foreground">{unread} unread</p>
-            <button onClick={handleMarkAll} className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
-              <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+            <button onClick={handleMarkAll} disabled={marking} className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 disabled:opacity-50">
+              <CheckCheck className="w-3.5 h-3.5" /> {marking ? 'Marking…' : 'Mark all read'}
             </button>
           </div>
         )}

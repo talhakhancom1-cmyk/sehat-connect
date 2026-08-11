@@ -42,7 +42,7 @@ function formatLocalDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-export default function BookingModal({ doctor, onClose, onConfirm }) {
+export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
   const modes = doctor.availability_modes || ['video'];
   const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()));
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -293,10 +293,10 @@ export default function BookingModal({ doctor, onClose, onConfirm }) {
           </div>
           <button
             onClick={handleConfirm}
-            disabled={!selectedDate || !selectedSlot}
+            disabled={booking || !selectedDate || !selectedSlot}
             className="flex-1 max-w-[200px] py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Confirm Booking
+            {booking ? 'Booking…' : 'Confirm Booking'}
           </button>
         </div>
       </div>

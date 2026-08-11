@@ -161,6 +161,22 @@ router.post('/', authenticate, async (req, res) => {
         body.doctor_user_id = doctor.user_id;
       }
     }
+    // Server-side duplicate check: prevent double-booking the same slot.
+    // The unique index is the final safety net, but this gives a clear error
+    // message instead of a raw constraint violation.
+    if (body.doctor_id && body.appointment_date && body.time_slot) {
+      const existing = await Appointment.findOne({
+        where: {
+          doctor_id: body.doctor_id,
+          appointment_date: body.appointment_date,
+          time_slot: body.time_slot,
+          status: ['pending', 'confirmed', 'in_progress'],
+        },
+      });
+      if (existing) {
+        return res.status(409).json({ error: 'This time slot is already booked. Please select a different time.' });
+      }
+    }
     const appointment = await Appointment.create(body);
 
     // Notify the doctor that a new appointment was booked.

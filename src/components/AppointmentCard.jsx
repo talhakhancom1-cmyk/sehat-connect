@@ -27,7 +27,7 @@ const typeBorder = {
   emergency: 'border-l-red-400',
 };
 
-export default function AppointmentCard({ appointment, onJoin, onCancel, onVideoCall, onPay, role = 'patient' }) {
+export default function AppointmentCard({ appointment, onJoin, onCancel, onVideoCall, onPay, role = 'patient', cancellingId, actionId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const gate = useAppointmentCallGate();
@@ -133,34 +133,38 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
           <>
             <button
               onClick={() => onJoin?.(appointment, 'confirmed')}
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all"
+              disabled={actionId === appointment.id}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
             >
-              Accept
+              {actionId === appointment.id ? 'Accepting…' : 'Accept'}
             </button>
             <button
               onClick={() => onCancel?.(appointment, 'rejected')}
-              className="px-4 py-2 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all"
+              disabled={actionId === appointment.id}
+              className="px-4 py-2 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all disabled:opacity-50"
             >
-              Reject
+              {actionId === appointment.id ? 'Rejecting…' : 'Reject'}
             </button>
           </>
         )}
         {appointment.status === 'confirmed' && role === 'doctor' && (
           <button
             onClick={() => onJoin?.(appointment, 'in_progress')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all"
+            disabled={actionId === appointment.id}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
           >
             <PlayCircle className="w-3.5 h-3.5" />
-            Start
+            {actionId === appointment.id ? 'Starting…' : 'Start'}
           </button>
         )}
         {appointment.status === 'in_progress' && role === 'doctor' && (
           <button
             onClick={() => onJoin?.(appointment, 'completed')}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 active:scale-95 transition-all"
+            disabled={actionId === appointment.id}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            Complete
+            {actionId === appointment.id ? 'Completing…' : 'Complete'}
           </button>
         )}
         {['pending', 'confirmed'].includes(appointment.status) && role === 'patient' && appointment.payment_status !== 'paid' && (
@@ -174,9 +178,10 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
         {['pending', 'confirmed'].includes(appointment.status) && role === 'patient' && (
           <button
             onClick={() => onCancel?.(appointment)}
-            className="ml-auto px-4 py-2 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-secondary active:scale-95 transition-all"
+            disabled={cancellingId === appointment.id}
+            className="ml-auto px-4 py-2 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-secondary active:scale-95 transition-all disabled:opacity-50"
           >
-            Cancel
+            {cancellingId === appointment.id ? 'Cancelling…' : 'Cancel'}
           </button>
         )}
         {appointment.status === 'completed' && (

@@ -25,6 +25,7 @@ export default function Medications() {
   const [doseEvents, setDoseEvents] = useState({});
   const [loading, setLoading] = useState(true);
   const [discontinuing, setDiscontinuing] = useState(null);
+  const [discontinuingId, setDiscontinuingId] = useState(null);
   const [reason, setReason] = useState('patient_choice');
   const [reasonDetail, setReasonDetail] = useState('');
 
@@ -49,25 +50,32 @@ export default function Medications() {
   const completedOrDiscontinued = plans.filter(p => !isPlanActive(p));
 
   const discontinue = async () => {
-    if (!discontinuing) return;
-    const now = new Date().toISOString();
-    await base44.entities.Discontinuation.create({
-      medication_plan_id: discontinuing.id,
-      prescription_id: discontinuing.prescription_id,
-      patient_id: discontinuing.patient_id,
-      patient_name: discontinuing.patient_name,
-      discontinued_by_id: user.id,
-      discontinued_by_name: user.full_name,
-      discontinued_by_role: 'patient',
-      reason,
-      reason_detail: reasonDetail || undefined,
-      discontinued_at: now,
-    });
-    await base44.entities.MedicationPlan.update(discontinuing.id, { status: 'discontinued', discontinued_at: now, discontinuation_reason: reason });
-    await recordAudit({ action: 'discontinuation', target_type: 'MedicationPlan', target_id: discontinuing.id, patient_id: discontinuing.patient_id, detail: `Patient stopped ${discontinuing.medication_name}: ${reason}` });
-    setDiscontinuing(null);
-    setReasonDetail('');
-    load();
+    if (!discontinuing || discontinuingId) return;
+    setDiscontinuingId(discontinuing.id);
+    try {
+      const now = new Date().toISOString();
+      await base44.entities.Discontinuation.create({
+        medication_plan_id: discontinuing.id,
+        prescription_id: discontinuing.prescription_id,
+        patient_id: discontinuing.patient_id,
+        patient_name: discontinuing.patient_name,
+        discontinued_by_id: user.id,
+        discontinued_by_name: user.full_name,
+        discontinued_by_role: 'patient',
+        reason,
+        reason_detail: reasonDetail || undefined,
+        discontinued_at: now,
+      });
+      await base44.entities.MedicationPlan.update(discontinuing.id, { status: 'discontinued', discontinued_at: now, discontinuation_reason: reason });
+      await recordAudit({ action: 'discontinuation', target_type: 'MedicationPlan', target_id: discontinuing.id, patient_id: discontinuing.patient_id, detail: `Patient stopped ${discontinuing.medication_name}: ${reason}` });
+      setDiscontinuing(null);
+      setReasonDetail('');
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDiscontinuingId(null);
+    }
   };
 
   const overallAdherence = () => {
@@ -143,8 +151,8 @@ export default function Medications() {
             </select>
             <input value={reasonDetail} onChange={e => setReasonDetail(e.target.value)} placeholder="Optional detail" className="w-full px-3 py-2 rounded-xl border border-input bg-card text-sm" />
             <div className="flex gap-2">
-              <button onClick={() => setDiscontinuing(null)} className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold">Cancel</button>
-              <button onClick={discontinue} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold">Confirm</button>
+              <button onClick={() => setDiscontinuing(null)} className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold" disabled={!!discontinuingId}>Cancel</button>
+              <button onClick={discontinue} disabled={!!discontinuingId} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold disabled:opacity-50">{discontinuingId ? 'Stopping…' : 'Confirm'}</button>
             </div>
           </div>
         </div>

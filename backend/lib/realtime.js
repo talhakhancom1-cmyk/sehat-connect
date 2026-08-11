@@ -196,6 +196,21 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         }
         console.log(`[realtime] DND check passed — target ${to_user_id} is available`);
 
+        // Prevent duplicate active calls for the same conversation.
+        // If there's already a ringing/active call, don't create another one.
+        if (conversation_id) {
+          const existingCall = await CallRoom.findOne({
+            where: {
+              conversation_id,
+              status: ['ringing', 'connecting', 'active'],
+            },
+          });
+          if (existingCall) {
+            console.log(`[realtime] call already in progress for conversation ${conversation_id}, blocking duplicate`);
+            return ack && ack({ error: 'A call is already in progress for this conversation.' });
+          }
+        }
+
         const room = await CallRoom.create({
           conversation_id,
           appointment_id,

@@ -181,6 +181,38 @@ const migrateMissingColumns = async () => {
   }
 };
 
+// Add unique constraints to prevent duplicate records at the database level.
+// These run AFTER syncDatabase so the tables exist. Partial unique indexes
+// (WHERE clause) allow multiple cancelled/rejected appointments for the same
+// slot while preventing double-booking active ones.
+const migrateUniqueConstraints = async () => {
+  const statements = [
+    // Prevent double-booking: only one active appointment per doctor+date+slot.
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_appointment_active_slot
+     ON appointments (doctor_id, appointment_date, time_slot)
+     WHERE status IN ('pending', 'confirmed', 'in_progress');`,
+    // One conversation per appointment (prevents duplicate chat threads)
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_appointment
+     ON conversations (appointment_id)
+     WHERE appointment_id IS NOT NULL AND status = 'active';`,
+    // Prevent duplicate messages via client_message_id (idempotency)
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_message_client_id
+     ON messages (conversation_id, client_message_id)
+     WHERE client_message_id IS NOT NULL;`,
+    // Prevent multiple active/ringing call rooms for the same conversation+initiator
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_callroom_active
+     ON call_rooms (conversation_id, initiator_id)
+     WHERE status IN ('ringing', 'connecting', 'active') AND conversation_id IS NOT NULL;`,
+  ];
+  for (const sql of statements) {
+    try {
+      await sequelize.query(sql);
+    } catch (error) {
+      console.log('ℹ️ Unique constraint migration skipped:', error.message);
+    }
+  }
+};
+
 // Initialize database
 const initializeDatabase = async () => {
   try {
@@ -190,6 +222,7 @@ const initializeDatabase = async () => {
       await migrateMedicalRecordEnums();
       await migrateMissingColumns();
       await syncDatabase();
+      await migrateUniqueConstraints();
     } else {
       console.log('Attempting to create database...');
       await createDatabase();

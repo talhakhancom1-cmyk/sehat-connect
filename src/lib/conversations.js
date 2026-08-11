@@ -68,6 +68,9 @@ export async function listMessages(conversationId) {
 
 export async function sendMessage(conversation, user, content, opts = {}) {
   const other = otherParty(conversation, user.id);
+  // Generate a client_message_id for idempotency — the backend uses this
+  // to deduplicate messages if the same request is sent twice (e.g. double-click).
+  const client_message_id = opts.client_message_id || `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const msg = await base44.entities.Message.create({
     conversation_id: conversation.id,
     sender_id: user.id,
@@ -77,6 +80,7 @@ export async function sendMessage(conversation, user, content, opts = {}) {
     content,
     type: opts.type || 'text',
     attachment_url: opts.attachment_url,
+    client_message_id,
     read: false,
   });
   await base44.entities.Conversation.update(conversation.id, { last_message_at: new Date().toISOString() }).catch(() => {});

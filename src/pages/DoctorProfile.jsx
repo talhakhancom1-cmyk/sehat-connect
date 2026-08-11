@@ -32,6 +32,7 @@ export default function DoctorProfile() {
   const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
+  const [booking, setBooking] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -73,6 +74,8 @@ export default function DoctorProfile() {
   const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 5);
 
   const handleConfirmBooking = async (bookingDetails) => {
+    if (booking) return;
+    setBooking(true);
     try {
       await base44.entities.Appointment.create({
         doctor_id: doctor.id,
@@ -93,6 +96,8 @@ export default function DoctorProfile() {
     } catch (e) {
       toast({ title: 'Booking failed', description: 'Could not book the appointment. Please try again.', variant: 'destructive' });
       console.error(e);
+    } finally {
+      setBooking(false);
     }
   };
 
@@ -323,6 +328,7 @@ export default function DoctorProfile() {
           doctor={doctor}
           onClose={() => setShowBooking(false)}
           onConfirm={handleConfirmBooking}
+          booking={booking}
         />
       )}
     </Layout>

@@ -26,6 +26,7 @@ export default function FindDoctors() {
   const [filters, setFilters] = useState({ specialty: '', city: '', mode: '', sort: '-rating' });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [booking, setBooking] = useState(false);
 
   useEffect(() => {
     loadDoctors();
@@ -67,6 +68,8 @@ export default function FindDoctors() {
   const handleBook = (doctor) => setSelectedDoctor(doctor);
 
   const handleConfirmBooking = async (bookingDetails) => {
+    if (booking) return;
+    setBooking(true);
     try {
       await base44.entities.Appointment.create({
         doctor_id: selectedDoctor.id,
@@ -87,6 +90,8 @@ export default function FindDoctors() {
     } catch (e) {
       toast({ title: 'Booking failed', description: 'Could not book the appointment. Please try again.', variant: 'destructive' });
       console.error(e);
+    } finally {
+      setBooking(false);
     }
   };
 
@@ -204,6 +209,7 @@ export default function FindDoctors() {
           doctor={selectedDoctor}
           onClose={() => setSelectedDoctor(null)}
           onConfirm={handleConfirmBooking}
+          booking={booking}
         />
       )}
     </Layout>

@@ -19,6 +19,7 @@ export default function DoctorAppointments() {
   const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [doctorEntityId, setDoctorEntityId] = useState(null);
+  const [actionId, setActionId] = useState(null);
 
   useEffect(() => { load(); }, [user]);
 
@@ -35,23 +36,31 @@ export default function DoctorAppointments() {
   };
 
   const handleAction = async (appt, action) => {
+    if (actionId) return;
     if (action === 'confirmed' && appt.payment_status !== 'paid') {
       alert('This appointment cannot be confirmed until the patient has paid. Ask the patient to complete payment first.');
       return;
     }
-    await base44.entities.Appointment.update(appt.id, { status: action });
+    setActionId(appt.id);
     try {
-      await base44.entities.AuditEvent.create({
-        actor_user_id: user?.id,
-        actor_role: 'doctor',
-        action: (action === 'cancelled' || action === 'rejected') ? 'appointment_cancel' : 'appointment_confirm',
-        target_type: 'Appointment',
-        target_id: appt.id,
-        patient_id: appt.patient_id,
-        detail: `Status changed to ${action}`,
-      });
-    } catch (e) { console.error('Audit log failed', e); }
-    load();
+      await base44.entities.Appointment.update(appt.id, { status: action });
+      try {
+        await base44.entities.AuditEvent.create({
+          actor_user_id: user?.id,
+          actor_role: 'doctor',
+          action: (action === 'cancelled' || action === 'rejected') ? 'appointment_cancel' : 'appointment_confirm',
+          target_type: 'Appointment',
+          target_id: appt.id,
+          patient_id: appt.patient_id,
+          detail: `Status changed to ${action}`,
+        });
+      } catch (e) { console.error('Audit log failed', e); }
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionId(null);
+    }
   };
 
   const filtered = tab === 'all' ? appointments : appointments.filter(a => a.status === tab);
@@ -112,6 +121,7 @@ export default function DoctorAppointments() {
                   role="doctor"
                   onJoin={handleAction}
                   onCancel={handleAction}
+                  actionId={actionId}
                   onVideoCall={(a) => startCallFromAppointment(a, user, { video: true })}
                 />
                 {['confirmed', 'completed', 'in_progress'].includes(appt.status) && (

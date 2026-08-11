@@ -27,6 +27,8 @@ export default function Emergency() {
 
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(true);
+  const [addingContact, setAddingContact] = useState(false);
+  const [deletingContactId, setDeletingContactId] = useState(null);
 
   const [hospitals, setHospitals] = useState([]);
   const [locLoading, setLocLoading] = useState(false);
@@ -46,6 +48,8 @@ export default function Emergency() {
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
   const addContact = async (form) => {
+    if (addingContact) return;
+    setAddingContact(true);
     try {
       const created = await base44.entities.EmergencyContact.create({
         name: form.name.trim(),
@@ -56,16 +60,22 @@ export default function Emergency() {
       toast({ title: 'Contact saved' });
     } catch {
       toast({ title: 'Could not save contact', variant: 'destructive' });
+    } finally {
+      setAddingContact(false);
     }
   };
 
   const deleteContact = async (contact) => {
+    if (deletingContactId) return;
+    setDeletingContactId(contact.id);
     try {
       await base44.entities.EmergencyContact.delete(contact.id);
       setContacts(prev => prev.filter(c => c.id !== contact.id));
       toast({ title: 'Contact removed' });
     } catch {
       toast({ title: 'Could not remove contact', variant: 'destructive' });
+    } finally {
+      setDeletingContactId(null);
     }
   };
 
@@ -265,7 +275,7 @@ export default function Emergency() {
         {/* Two Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <NearbyHospitals hospitals={hospitals} loading={locLoading} error={locError} address={address} onEnable={enableLocation} enabled={enabled} />
-          <EmergencyContacts contacts={contacts} onAdd={addContact} onDelete={deleteContact} loading={contactsLoading} />
+          <EmergencyContacts contacts={contacts} onAdd={addContact} onDelete={deleteContact} loading={contactsLoading} addingContact={addingContact} deletingContactId={deletingContactId} />
         </div>
 
         {/* Quick Actions */}

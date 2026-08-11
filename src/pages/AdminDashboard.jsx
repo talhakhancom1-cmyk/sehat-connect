@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [verifyingId, setVerifyingId] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -61,8 +62,16 @@ export default function AdminDashboard() {
   });
 
   const handleVerify = async (doctorId, status) => {
-    await base44.entities.Doctor.update(doctorId, { verification_status: status });
-    load();
+    if (verifyingId) return;
+    setVerifyingId(doctorId);
+    try {
+      await base44.entities.Doctor.update(doctorId, { verification_status: status });
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setVerifyingId(null);
+    }
   };
 
   return (
@@ -129,11 +138,11 @@ export default function AdminDashboard() {
                     <p className="text-xs text-muted-foreground">{doc.specialty} · {doc.city}</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => handleVerify(doc.id, 'verified')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Verify
+                    <button onClick={() => handleVerify(doc.id, 'verified')} disabled={verifyingId === doc.id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50">
+                      <ShieldCheck className="w-3.5 h-3.5" /> {verifyingId === doc.id ? 'Verifying…' : 'Verify'}
                     </button>
-                    <button onClick={() => handleVerify(doc.id, 'suspended')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all">
-                      <Ban className="w-3.5 h-3.5" /> Reject
+                    <button onClick={() => handleVerify(doc.id, 'suspended')} disabled={verifyingId === doc.id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all disabled:opacity-50">
+                      <Ban className="w-3.5 h-3.5" /> {verifyingId === doc.id ? 'Rejecting…' : 'Reject'}
                     </button>
                   </div>
                 </div>

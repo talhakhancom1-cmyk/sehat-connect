@@ -30,6 +30,7 @@ export default function Home() {
   const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
   const gate = useAppointmentCallGate();
   const [openingChat, setOpeningChat] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => { if (user?.id) loadData(); }, [user?.id]);
 
@@ -64,6 +65,22 @@ export default function Home() {
   const canJoinCall = nextAppt?.status === 'confirmed' && nextAppt?.type === 'video';
   const callGate = nextAppt ? gate.getCallGateState(nextAppt) : null;
 
+  const handleCancelAppt = async () => {
+    if (cancellingId) return;
+    if (!window.confirm('Cancel this appointment? This action cannot be undone.')) return;
+    setCancellingId(nextAppt.id);
+    try {
+      await base44.entities.Appointment.update(nextAppt.id, { status: 'cancelled' });
+      toast({ title: 'Appointment cancelled', description: `Your appointment with ${nextAppt.doctor_name} has been cancelled.` });
+      loadData();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Could not cancel appointment', variant: 'destructive' });
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5 animate-fade-in">
@@ -95,15 +112,11 @@ export default function Home() {
             </div>
             <div className="flex gap-2.5 mt-4">
               <button
-                onClick={async () => {
-                  if (!window.confirm('Cancel this appointment? This action cannot be undone.')) return;
-                  await base44.entities.Appointment.update(nextAppt.id, { status: 'cancelled' });
-                  toast({ title: 'Appointment cancelled', description: `Your appointment with ${nextAppt.doctor_name} has been cancelled.` });
-                  loadData();
-                }}
-                className="flex-1 py-2.5 rounded-2xl border border-[#E7DDD2] text-sm font-medium text-[#6B5B4F] hover:bg-[#F7F1EA] active:scale-95 transition-all"
+                onClick={handleCancelAppt}
+                disabled={!!cancellingId}
+                className="flex-1 py-2.5 rounded-2xl border border-[#E7DDD2] text-sm font-medium text-[#6B5B4F] hover:bg-[#F7F1EA] active:scale-95 transition-all disabled:opacity-50"
               >
-                Cancel
+                {cancellingId ? 'Cancelling…' : 'Cancel'}
               </button>
               {canJoinCall ? (
                 <>

@@ -4,20 +4,29 @@ import { useToast } from '@/components/ui/use-toast';
 
 const RELATIONS = ['Spouse', 'Parent', 'Sibling', 'Child', 'Family Doctor', 'Friend', 'Other'];
 
-export default function EmergencyContacts({ contacts, onAdd, onDelete, loading }) {
+export default function EmergencyContacts({ contacts, onAdd, onDelete, loading, addingContact, deletingContactId }) {
   const { toast } = useToast();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', relation: RELATIONS[0], phone: '' });
+  const [saving, setSaving] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.name.trim() || !form.phone.trim()) {
       toast({ title: 'Name and phone are required', variant: 'destructive' });
       return;
     }
-    await onAdd(form);
-    setForm({ name: '', relation: RELATIONS[0], phone: '' });
-    setAdding(false);
+    setSaving(true);
+    try {
+      await onAdd(form);
+      setForm({ name: '', relation: RELATIONS[0], phone: '' });
+      setAdding(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -47,7 +56,7 @@ export default function EmergencyContacts({ contacts, onAdd, onDelete, loading }
             </select>
             <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+92 300 1234567" className="w-full px-3 py-2 rounded-lg border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
-          <button type="submit" className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">Save Contact</button>
+          <button type="submit" disabled={saving || addingContact} className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">{(saving || addingContact) ? 'Saving…' : 'Save Contact'}</button>
         </form>
       )}
 
@@ -73,7 +82,7 @@ export default function EmergencyContacts({ contacts, onAdd, onDelete, loading }
               <div className="flex items-center gap-1">
                 <a href={`tel:${contact.phone}`} className="p-2 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"><Phone className="w-3.5 h-3.5" /></a>
                 <a href={`sms:${contact.phone}`} className="p-2 rounded-md bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"><MessageSquare className="w-3.5 h-3.5" /></a>
-                <button onClick={() => onDelete(contact)} className="p-2 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => onDelete(contact)} disabled={deletingContactId === contact.id} className="p-2 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           );

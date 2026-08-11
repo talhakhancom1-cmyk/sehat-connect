@@ -26,17 +26,26 @@ export default function AdminDoctors() {
   };
 
   const [reviewing, setReviewing] = useState(null);
+  const [verifyingId, setVerifyingId] = useState(null);
 
   const handleVerify = async (doctor, status) => {
-    await base44.entities.Doctor.update(doctor.id, { verification_status: status });
-    await recordAudit({
-      action: status === 'verified' ? 'doctor_verify' : status === 'suspended' ? 'doctor_suspend' : 'doctor_verify',
-      target_type: 'Doctor',
-      target_id: doctor.id,
-      detail: `Admin set verification to ${status}`,
-    });
-    setReviewing(null);
-    load();
+    if (verifyingId) return;
+    setVerifyingId(doctor.id);
+    try {
+      await base44.entities.Doctor.update(doctor.id, { verification_status: status });
+      await recordAudit({
+        action: status === 'verified' ? 'doctor_verify' : status === 'suspended' ? 'doctor_suspend' : 'doctor_verify',
+        target_type: 'Doctor',
+        target_id: doctor.id,
+        detail: `Admin set verification to ${status}`,
+      });
+      setReviewing(null);
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setVerifyingId(null);
+    }
   };
 
   const filtered = doctors.filter(d => {
@@ -95,18 +104,18 @@ export default function AdminDoctors() {
                     <FileText className="w-3.5 h-3.5" /> Review
                   </button>
                   {doc.verification_status !== 'verified' && (
-                    <button onClick={() => handleVerify(doc, 'verified')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Verify
+                    <button onClick={() => handleVerify(doc, 'verified')} disabled={verifyingId === doc.id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50">
+                      <ShieldCheck className="w-3.5 h-3.5" /> {verifyingId === doc.id ? 'Verifying…' : 'Verify'}
                     </button>
                   )}
                   {doc.verification_status !== 'suspended' && (
-                    <button onClick={() => handleVerify(doc, 'suspended')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all">
-                      <Ban className="w-3.5 h-3.5" /> Suspend
+                    <button onClick={() => handleVerify(doc, 'suspended')} disabled={verifyingId === doc.id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-xs font-semibold hover:bg-red-100 active:scale-95 transition-all disabled:opacity-50">
+                      <Ban className="w-3.5 h-3.5" /> {verifyingId === doc.id ? 'Suspending…' : 'Suspend'}
                     </button>
                   )}
                   {doc.verification_status !== 'pending' && (
-                    <button onClick={() => handleVerify(doc, 'pending')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground text-xs font-semibold hover:bg-secondary/80 active:scale-95 transition-all ml-auto">
-                      <RotateCcw className="w-3.5 h-3.5" /> Reset
+                    <button onClick={() => handleVerify(doc, 'pending')} disabled={verifyingId === doc.id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground text-xs font-semibold hover:bg-secondary/80 active:scale-95 transition-all ml-auto disabled:opacity-50">
+                      <RotateCcw className="w-3.5 h-3.5" /> {verifyingId === doc.id ? 'Resetting…' : 'Reset'}
                     </button>
                   )}
                 </div>
@@ -159,11 +168,11 @@ export default function AdminDoctors() {
               <DocLink label="Identity document" url={reviewing.identity_document_url} />
 
               <div className="flex items-center gap-2 pt-2">
-                <button onClick={() => handleVerify(reviewing, 'verified')} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-95 transition-all">
-                  <ShieldCheck className="w-4 h-4" /> Verify doctor
+                <button onClick={() => handleVerify(reviewing, 'verified')} disabled={verifyingId === reviewing.id} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50">
+                  <ShieldCheck className="w-4 h-4" /> {verifyingId === reviewing.id ? 'Verifying…' : 'Verify doctor'}
                 </button>
-                <button onClick={() => handleVerify(reviewing, 'suspended')} className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-sm font-semibold hover:bg-red-100 active:scale-95 transition-all">
-                  <Ban className="w-4 h-4" /> Suspend
+                <button onClick={() => handleVerify(reviewing, 'suspended')} disabled={verifyingId === reviewing.id} className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 text-sm font-semibold hover:bg-red-100 active:scale-95 transition-all disabled:opacity-50">
+                  <Ban className="w-4 h-4" /> {verifyingId === reviewing.id ? 'Suspending…' : 'Suspend'}
                 </button>
               </div>
             </div>

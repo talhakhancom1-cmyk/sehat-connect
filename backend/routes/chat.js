@@ -112,6 +112,22 @@ router.post('/conversations', authenticate, async (req, res) => {
     if (body.patient_id && !memberIds.includes(body.patient_id)) memberIds.push(body.patient_id);
     if (body.doctor_id && !memberIds.includes(body.doctor_id)) memberIds.push(body.doctor_id);
 
+    // Server-side duplicate check: if a conversation already exists for this
+    // appointment, return it instead of creating a duplicate.
+    if (body.appointment_id) {
+      const existing = await Conversation.findOne({
+        where: { appointment_id: body.appointment_id, status: 'active' },
+      });
+      if (existing) {
+        return res.status(200).json({
+          ...existing.toJSON(),
+          member_ids: parseMemberIds(existing.member_ids),
+          created_date: existing.created_at,
+          updated_date: existing.updated_at,
+        });
+      }
+    }
+
     const conversation = await Conversation.create({
       patient_id: body.patient_id,
       patient_name: body.patient_name,
