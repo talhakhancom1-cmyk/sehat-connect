@@ -19,6 +19,8 @@ const ALLOWED_MIME_TYPES = [
   'audio/mpeg',
   'audio/wav',
   'audio/ogg',
+  'audio/webm',
+  'audio/webm;codecs=opus',
   'video/webm',
   'video/mp4',
 ];
