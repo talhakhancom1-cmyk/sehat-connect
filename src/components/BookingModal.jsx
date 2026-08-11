@@ -43,15 +43,18 @@ function formatLocalDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
+export default function BookingModal({ doctor, onClose, onConfirm, booking, prefillDate, prefillSlot }) {
   const modes = doctor.availability_modes || ['video'];
-  const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()));
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(() => prefillDate || formatLocalDate(new Date()));
+  const [selectedSlot, setSelectedSlot] = useState(() => prefillSlot || null);
   const [selectedType, setSelectedType] = useState(modes[0] || 'video');
   const [schedule, setSchedule] = useState(null);
   const [bookedSlots, setBookedSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Track whether we still need to auto-select the prefilled slot once slots
+  // for the prefilled date have finished loading.
+  const [pendingPrefillSlot, setPendingPrefillSlot] = useState(prefillSlot || null);
 
   const dates = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
@@ -105,6 +108,18 @@ export default function BookingModal({ doctor, onClose, onConfirm, booking }) {
     };
     loadAvailability();
   }, [selectedDate, doctor?.id]);
+
+  // Auto-select the prefilled slot once slots for the prefilled date have
+  // finished loading. This runs after the availability fetch completes and
+  // the available slots are computed for the current render.
+  useEffect(() => {
+    if (!pendingPrefillSlot || loading) return;
+    const slots = getSlots();
+    if (slots.includes(pendingPrefillSlot) && !bookedSlots.includes(pendingPrefillSlot)) {
+      setSelectedSlot(pendingPrefillSlot);
+    }
+    setPendingPrefillSlot(null);
+  }, [loading, pendingPrefillSlot, schedule, bookedSlots]);
 
   const getSlots = () => {
     if (!selectedDate) return [];

@@ -8,6 +8,7 @@ import {
   Stethoscope, Activity, User, ChevronRight
 } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
+import MedicationAdherence from '@/components/MedicationAdherence';
 
 const categoryColors = {
   'Blood Report': 'text-rose-600 bg-rose-100',
@@ -154,6 +155,7 @@ export default function PatientOverviewDialog({ patientName, patientId, doctorId
               <div className="flex-1 overflow-y-auto scrollbar-thin p-5">
                 {tab === 'overview' && (
                   <OverviewTab
+                    patientId={patientId}
                     patientName={patientName}
                     patientAge={patientAge}
                     patientGender={patientGender}
@@ -200,7 +202,7 @@ export default function PatientOverviewDialog({ patientName, patientId, doctorId
   );
 }
 
-function OverviewTab({ patientName, patientAge, patientGender, records, prescriptions, appointments, onTabChange }) {
+function OverviewTab({ patientId, patientName, patientAge, patientGender, records, prescriptions, appointments, onTabChange }) {
   const stats = [
     { label: 'Total Visits', value: appointments.length, icon: CalendarDays, color: 'text-blue-600 bg-blue-100' },
     { label: 'Records', value: records.length, icon: FileText, color: 'text-rose-600 bg-rose-100' },
@@ -228,6 +230,9 @@ function OverviewTab({ patientName, patientAge, patientGender, records, prescrip
           );
         })}
       </div>
+
+      {/* Medication adherence (consent enforced server-side) */}
+      {patientId && <MedicationAdherence patientId={patientId} />}
 
       {/* Recent prescriptions */}
       <div>

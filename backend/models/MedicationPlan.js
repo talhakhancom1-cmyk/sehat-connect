@@ -59,6 +59,10 @@ const MedicationPlan = sequelize.define('MedicationPlan', {
   instructions: {
     type: DataTypes.TEXT
   },
+  reminders_enabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
   status: {
     type: DataTypes.ENUM('active', 'completed', 'discontinued'),
     defaultValue: 'active'

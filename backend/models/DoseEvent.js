@@ -29,8 +29,8 @@ const DoseEvent = sequelize.define('DoseEvent', {
     allowNull: false
   },
   status: {
-    type: DataTypes.ENUM('taken', 'skipped', 'snoozed', 'missed'),
-    defaultValue: 'taken'
+    type: DataTypes.ENUM('pending', 'taken', 'skipped', 'snoozed', 'missed'),
+    defaultValue: 'pending'
   },
   source: {
     type: DataTypes.STRING,

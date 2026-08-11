@@ -62,6 +62,8 @@ const CountryConfig = require('./CountryConfig');
 const DoseEvent = require('./DoseEvent');
 const Discontinuation = require('./Discontinuation');
 const ConversationMember = require('./ConversationMember');
+const ReminderPreference = require('./ReminderPreference');
+const SymptomSession = require('./SymptomSession');
 
 // Identity domain associations
 User.hasMany(Device, { foreignKey: 'user_id', constraints: false });
@@ -267,5 +269,7 @@ module.exports = {
   CountryConfig,
   DoseEvent,
   Discontinuation,
-  ConversationMember
+  ConversationMember,
+  ReminderPreference,
+  SymptomSession
 };

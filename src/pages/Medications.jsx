@@ -3,11 +3,28 @@ import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import EmptyState from '@/components/EmptyState';
 import DoseLogger from '@/components/DoseLogger';
+import ReminderSettings from '@/components/ReminderSettings';
 import StatusBadge from '@/components/StatusBadge';
 import { useAuth } from '@/lib/AuthContext';
 import { recordAudit } from '@/lib/audit';
 import { isPlanActive, computeAdherence } from '@/lib/medication';
-import { Pill, Ban, Clock } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
+import { Pill, Ban, Clock, Check, X, AlertCircle, CalendarClock } from 'lucide-react';
+
+const isToday = (iso) => {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+};
+
+const formatTime = (iso) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 const DISCONTINUE_REASONS = [
   { value: 'adverse_reaction', label: 'Adverse reaction' },
@@ -21,6 +38,7 @@ const DISCONTINUE_REASONS = [
 
 export default function Medications() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [plans, setPlans] = useState([]);
   const [doseEvents, setDoseEvents] = useState({});
   const [loading, setLoading] = useState(true);
@@ -28,11 +46,27 @@ export default function Medications() {
   const [discontinuingId, setDiscontinuingId] = useState(null);
   const [reason, setReason] = useState('patient_choice');
   const [reasonDetail, setReasonDetail] = useState('');
+  const [actioningId, setActioningId] = useState(null);
 
   useEffect(() => { if (user?.id) load(); }, [user?.id]);
 
+  const generateDoses = async () => {
+    // Ask the backend to materialise any pending dose events for active plans.
+    // Best-effort: failures are non-fatal (endpoint may not exist yet).
+    try {
+      await fetch(`${base44.apiUrl}/medication-plans/generate-doses`, {
+        method: 'POST',
+        headers: base44.headers(),
+        body: JSON.stringify({ patient_id: user.id }),
+      });
+    } catch {
+      /* non-fatal */
+    }
+  };
+
   const load = async () => {
     try {
+      await generateDoses();
       const myPlans = await base44.entities.MedicationPlan.filter({ patient_id: user.id }, '-start_date', 100);
       setPlans(myPlans);
       // Load dose events per plan in one query and group.
@@ -44,6 +78,26 @@ export default function Medications() {
       setDoseEvents(grouped);
     } catch { setPlans([]); }
     finally { setLoading(false); }
+  };
+
+  // Mark a pending dose as taken/skipped via the status-specific endpoint.
+  const markDose = async (dose, newStatus) => {
+    if (actioningId) return;
+    setActioningId(dose.id);
+    try {
+      const resp = await fetch(`${base44.apiUrl}/dose-events/${dose.id}/status`, {
+        method: 'PUT',
+        headers: base44.headers(),
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!resp.ok) throw new Error('Could not update dose');
+      await recordAudit({ action: 'dose_event_update', target_type: 'DoseEvent', target_id: dose.id, patient_id: user.id, detail: `Dose ${newStatus}` });
+      load();
+    } catch (e) {
+      toast({ title: 'Could not update dose', description: toUserError(e), variant: 'destructive' });
+    } finally {
+      setActioningId(null);
+    }
   };
 
   const active = plans.filter(isPlanActive);
@@ -86,6 +140,16 @@ export default function Medications() {
 
   const rate = overallAdherence();
 
+  // Build a flat list of today's pending + missed doses across all plans,
+  // enriched with the parent plan's medication name/dosage for display.
+  const planById = new Map(plans.map(p => [p.id, p]));
+  const allEvents = Object.values(doseEvents).flat();
+  const todayPending = allEvents
+    .filter(d => d.status === 'pending' && isToday(d.taken_at))
+    .sort((a, b) => new Date(a.taken_at) - new Date(b.taken_at))
+    .map(d => ({ ...d, plan: planById.get(d.medication_plan_id) }));
+  const missedCount = allEvents.filter(d => d.status === 'missed').length;
+
   return (
     <Layout title="Medications">
       <div className="space-y-4 animate-fade-in">
@@ -97,6 +161,57 @@ export default function Medications() {
               <p className="text-xs text-muted-foreground">Overall adherence across all medications</p>
             </div>
           </div>
+        )}
+
+        <ReminderSettings />
+
+        {/* Today's Doses */}
+        {!loading && (todayPending.length > 0 || missedCount > 0) && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold flex items-center gap-1.5">
+                <CalendarClock className="w-4 h-4 text-primary" />
+                Today's Doses
+              </h2>
+              {missedCount > 0 && (
+                <span className="flex items-center gap-1 text-[11px] text-red-600 font-medium">
+                  <AlertCircle className="w-3 h-3" /> {missedCount} missed
+                </span>
+              )}
+            </div>
+            {todayPending.length > 0 ? (
+              <div className="space-y-2">
+                {todayPending.map(d => (
+                  <div key={d.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-border bg-card">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{d.plan?.medication_name || 'Medication'}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {d.plan?.dosage} · {formatTime(d.taken_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => markDose(d, 'taken')}
+                        disabled={actioningId === d.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        <Check className="w-3 h-3" /> Taken
+                      </button>
+                      <button
+                        onClick={() => markDose(d, 'skipped')}
+                        disabled={actioningId === d.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary text-muted-foreground text-xs font-medium hover:bg-secondary/80 disabled:opacity-50"
+                      >
+                        <X className="w-3 h-3" /> Skip
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No upcoming doses scheduled for today.</p>
+            )}
+          </section>
         )}
 
         <section>

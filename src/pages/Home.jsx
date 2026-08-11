@@ -6,7 +6,7 @@ import Layout from '@/components/Layout';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
-import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, Eye, Star, Video, BadgeCheck, FileText, Pill, QrCode } from 'lucide-react';
+import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, Eye, Star, Video, BadgeCheck, FileText, Pill, QrCode, ArrowRight } from 'lucide-react';
 import { cn, formatAppointmentDate } from '@/lib/utils';
 import { getOrCreateForAppointment } from '@/lib/conversations';
 import { useCallInitiator } from '@/lib/useCallInitiator';
@@ -182,6 +182,24 @@ export default function Home() {
             Search Doctor
           </Link>
         </div>
+
+        {/* Symptom Checker Card */}
+        <Link
+          to="/symptom-checker"
+          className="block bg-gradient-to-r from-[#D97757] to-[#C9683F] rounded-3xl p-4 shadow-warm animate-slide-up"
+          style={{ animationDelay: '90ms' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+              <Stethoscope className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-bold text-sm">AI Symptom Checker</p>
+              <p className="text-white/80 text-xs">Describe your symptoms and find the right doctor</p>
+            </div>
+            <ArrowRight className="w-5 h-5 text-white" />
+          </div>
+        </Link>
 
         {/* Medical Specialities */}
         <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>

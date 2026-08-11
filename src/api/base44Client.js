@@ -120,7 +120,7 @@ const ENTITY_NAMES = [
   'Household', 'HouseholdMember', 'Delegation', 'Encounter', 'Notification', 'Payment', 'Review',
   'Consent', 'AuditEvent', 'EmergencyContact', 'Discontinuation', 'DoseEvent',
   'MedicationPlan', 'Schedule', 'Conversation', 'ConversationMember', 'Message', 'TrackingConfig',
-  'CountryConfig',
+  'CountryConfig', 'ReminderPreference',
 ];
 
 const entities = {};
@@ -232,4 +232,15 @@ const integrations = {
   },
 };
 
-export const base44 = { auth, entities, functions, integrations };
+// Exposed for custom (non-CRUD) endpoints that aren't covered by the entity
+// client, e.g. PUT /api/dose-events/:id/status or GET /api/dose-events/adherence.
+const apiUrl = API_BASE_URL;
+const headers = () => {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+export const base44 = { auth, entities, functions, integrations, apiUrl, headers };

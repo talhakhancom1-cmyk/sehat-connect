@@ -112,12 +112,17 @@ async function sendMedicationReminders(io) {
     const now = new Date();
     const in30Min = new Date(now.getTime() + 30 * 60 * 1000);
 
+    // Find pending doses due in the next 30 minutes
     const doses = await DoseEvent.findAll({
       where: {
-        status: 'taken', // not yet acted on — default status
+        status: 'pending',
         taken_at: { [Op.between]: [now, in30Min] },
       },
     });
+
+    // Get patient emails for email delivery
+    const { User, MedicationPlan } = require('../models');
+    const ReminderPreference = require('../models/ReminderPreference');
 
     for (const dose of doses) {
       const reminderKey = `dose_${dose.id}`;
@@ -129,16 +134,47 @@ async function sendMedicationReminders(io) {
         },
       });
       if (!existing) {
+        // Get medication name and dosage
+        const plan = await MedicationPlan.findByPk(dose.medication_plan_id);
+        if (plan && plan.reminders_enabled === false) continue; // Skip if reminders disabled for this med
+
+        // Check if patient has reminders enabled globally
+        const pref = await ReminderPreference.findOne({ where: { patient_id: dose.patient_id } });
+        if (pref && pref.reminders_enabled === false) continue;
+
+        // Get patient email for email delivery
+        const patient = await User.findByPk(dose.patient_id);
+        const medName = plan?.medication_name || 'your medication';
+        const dosage = plan?.dosage || '';
+
         await sendNotification({
           user_id: dose.patient_id,
           type: 'medication_reminder',
           title: 'Medication reminder',
-          body: `Time to take your medication.`,
-          data: { dose_event_id: dose.id, reminder_key: reminderKey },
+          body: `Time to take ${medName}${dosage ? ` (${dosage})` : ''}.`,
+          data: {
+            dose_event_id: dose.id,
+            reminder_key: reminderKey,
+            medication_name: medName,
+            dosage,
+            email: patient?.email, // Include email so notificationDispatcher sends email too
+          },
           priority: 'normal',
         }, io);
       }
     }
+
+    // Mark overdue pending doses as missed (past 2 hours from scheduled time)
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    await DoseEvent.update(
+      { status: 'missed' },
+      {
+        where: {
+          status: 'pending',
+          taken_at: { [Op.lt]: twoHoursAgo },
+        },
+      }
+    );
   } catch (err) {
     console.error('[scheduler] Medication reminders failed:', err.message);
   }

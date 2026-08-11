@@ -28,6 +28,9 @@ node_modules
 
 # Build output
 dist
+
+# Backups (contain secrets — never commit)
+backups/
 dist-ssr
 *.local
 

@@ -17,6 +17,7 @@ import ImportRecord from '@/pages/ImportRecord';
 import Prescriptions from '@/pages/Prescriptions';
 import Medications from '@/pages/Medications';
 import Emergency from '@/pages/Emergency';
+import SymptomChecker from '@/pages/SymptomChecker';
 import ConsultationHistory from '@/pages/ConsultationHistory';
 import DoctorDashboard from '@/pages/DoctorDashboard';
 import DoctorAppointments from '@/pages/DoctorAppointments';
@@ -106,6 +107,7 @@ const AuthenticatedApp = () => {
         <Route path="/prescriptions" element={<Prescriptions />} />
         <Route path="/medications" element={<Medications />} />
         <Route path="/emergency" element={<Emergency />} />
+        <Route path="/symptom-checker" element={<SymptomChecker />} />
         <Route path="/history" element={<ConsultationHistory />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chat/:conversationId" element={<ChatThread />} />
