@@ -58,7 +58,7 @@ function invalidateAiConfigCache() {
   _cacheExpiry = 0;
 }
 
-const SYSTEM_PROMPT = `You are a healthcare triage assistant for the Sehat Connect platform. Your role is STRICTLY LIMITED to:
+const SYSTEM_PROMPT = `You are a healthcare triage assistant for the EcoHealth platform. Your role is STRICTLY LIMITED to:
 
 1. Asking clarifying questions about symptoms (duration, severity, associated symptoms) — maximum 2-3 exchanges.
 2. Providing one of three urgency levels:

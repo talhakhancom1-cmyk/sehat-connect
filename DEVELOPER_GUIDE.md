@@ -1,4 +1,4 @@
-# Sehat Connect — Developer Guide
+# EcoHealth — Developer Guide
 ---
 
 ## 2. Live URLs
@@ -19,7 +19,7 @@
 
 | Detail | Value |
 |--------|-------|
-| **Email** | `admin@sehat.local` |
+| **Email** | `admin@ecohealth.local` |
 | **Password** | `cLKArLVZF6f0dO8dny7MGoMB` |
 | **Role** | `super_admin` |
 
@@ -27,7 +27,7 @@
 ```bash
 curl -X POST https://afridiwins.online/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@sehat.local","password":"cLKArLVZF6f0dO8dny7MGoMB"}'
+  -d '{"email":"admin@ecohealth.local","password":"cLKArLVZF6f0dO8dny7MGoMB"}'
 ```
 
 ### Login via Web
@@ -54,7 +54,7 @@ Open https://afridiwins.online and use the credentials above.
 ## 5. File Structure on VPS
 
 ```
-/opt/sehat-connect/                    ← Application root
+/opt/ecohealth/                    ← Application root
 ├── .env.production                    ← Frontend API URL (VITE_API_BASE_URL)
 ├── dist/                              ← Built frontend (served by Nginx)
 │   ├── index.html
@@ -114,7 +114,7 @@ Open https://afridiwins.online and use the credentials above.
 
 ## 6. Environment Configuration
 
-### Backend `.env` (`/opt/sehat-connect/backend/.env`)
+### Backend `.env` (`/opt/ecohealth/backend/.env`)
 ```env
 PORT=3000
 NODE_ENV=production
@@ -122,7 +122,7 @@ NODE_ENV=production
 # PostgreSQL
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=sehat_connect
+DB_NAME=ecohealth
 DB_USER=sehat
 DB_PASSWORD=<secure-password>
 
@@ -134,7 +134,7 @@ FILE_DOWNLOAD_SECRET=<64-char-random-hex>
 CORS_ORIGIN=https://afridiwins.online
 
 # Admin seed
-ADMIN_EMAIL=admin@sehat.local
+ADMIN_EMAIL=admin@ecohealth.local
 ADMIN_PASSWORD=cLKArLVZF6f0dO8dny7MGoMB
 
 # MinIO
@@ -143,19 +143,19 @@ MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=sehat_minio_admin
 MINIO_SECRET_KEY=<secure-password>
-MINIO_BUCKET=sehat-uploads
+MINIO_BUCKET=ecohealth-uploads
 MINIO_PUBLIC_BASE_URL=https://afridiwins.online/files
 ```
 
-### Frontend `.env.production` (`/opt/sehat-connect/.env.production`)
+### Frontend `.env.production` (`/opt/ecohealth/.env.production`)
 ```env
 VITE_API_BASE_URL=https://afridiwins.online/api
 ```
 
 ### View/Edit .env on VPS
 ```bash
-cat /opt/sehat-connect/backend/.env       # View
-nano /opt/sehat-connect/backend/.env      # Edit
+cat /opt/ecohealth/backend/.env       # View
+nano /opt/ecohealth/backend/.env      # Edit
 ```
 
 ---
@@ -166,27 +166,27 @@ nano /opt/sehat-connect/backend/.env      # Edit
 |--------|-------|
 | **Host** | `localhost` |
 | **Port** | `5432` |
-| **Database** | `sehat_connect` |
+| **Database** | `ecohealth` |
 | **User** | `sehat` |
 | **Tables** | 50 tables |
 
 ### Access PostgreSQL
 ```bash
 # As postgres superuser
-sudo -u postgres psql -d sehat_connect
+sudo -u postgres psql -d ecohealth
 
 # As sehat user
-psql -U sehat -d sehat_connect -h localhost
+psql -U sehat -d ecohealth -h localhost
 ```
 
 ### List All Tables
 ```bash
-sudo -u postgres psql -d sehat_connect -c '\dt'
+sudo -u postgres psql -d ecohealth -c '\dt'
 ```
 
 ### Count Users
 ```bash
-sudo -u postgres psql -d sehat_connect -c "SELECT count(*) FROM users;"
+sudo -u postgres psql -d ecohealth -c "SELECT count(*) FROM users;"
 ```
 
 ### Database Tables (50 total)
@@ -214,16 +214,16 @@ reviews, schedules, sessions, tracking_configs, uploaded_files, users
 | **Server** | `localhost:9000` |
 | **Console** | `localhost:9001` |
 | **Access Key** | `sehat_minio_admin` |
-| **Bucket** | `sehat-uploads` |
+| **Bucket** | `ecohealth-uploads` |
 | **Data Path** | `/data/minio` |
 | **Systemd Service** | `minio.service` |
 
 ### MinIO Commands
 ```bash
 mc alias set local http://127.0.0.1:9000 sehat_minio_admin '<password>'
-mc ls local/sehat-uploads/                    # List files
+mc ls local/ecohealth-uploads/                    # List files
 mc mb local/new-bucket                        # Create bucket
-mc rm local/sehat-uploads/filename.txt        # Delete file
+mc rm local/ecohealth-uploads/filename.txt        # Delete file
 systemctl status minio                         # Check service
 systemctl restart minio                        # Restart
 ```
@@ -317,20 +317,20 @@ curl https://afridiwins.online/health
 ### Commands
 ```bash
 pm2 status                              # Check process status
-pm2 logs sehat-connect-backend          # View live logs
-pm2 logs sehat-connect-backend --lines 50  # View last 50 lines
-pm2 restart sehat-connect-backend       # Restart backend
-pm2 stop sehat-connect-backend          # Stop backend
-pm2 start sehat-connect-backend         # Start backend
-pm2 delete sehat-connect-backend        # Remove from PM2
+pm2 logs ecohealth-backend          # View live logs
+pm2 logs ecohealth-backend --lines 50  # View last 50 lines
+pm2 restart ecohealth-backend       # Restart backend
+pm2 stop ecohealth-backend          # Stop backend
+pm2 start ecohealth-backend         # Start backend
+pm2 delete ecohealth-backend        # Remove from PM2
 pm2 monit                               # Real-time monitor
 pm2 flush                               # Clear logs
 ```
 
 ### Log Files
 ```bash
-/opt/sehat-connect/backend/logs/out.log     # Standard output
-/opt/sehat-connect/backend/logs/error.log   # Errors
+/opt/ecohealth/backend/logs/out.log     # Standard output
+/opt/ecohealth/backend/logs/error.log   # Errors
 ```
 
 ### PM2 Startup (auto-restart on reboot)
@@ -345,8 +345,8 @@ pm2 save
 
 ### Config File
 ```bash
-/etc/nginx/sites-available/sehat-connect    # Main config
-/etc/nginx/sites-enabled/sehat-connect      # Symlink (active)
+/etc/nginx/sites-available/ecohealth    # Main config
+/etc/nginx/sites-enabled/ecohealth      # Symlink (active)
 ```
 
 ### Commands
@@ -355,12 +355,12 @@ nginx -t                                   # Test config
 systemctl reload nginx                     # Reload after changes
 systemctl restart nginx                    # Full restart
 systemctl status nginx                     # Check status
-tail -f /var/log/nginx/sehat-connect-access.log  # Access log
-tail -f /var/log/nginx/sehat-connect-error.log   # Error log
+tail -f /var/log/nginx/ecohealth-access.log  # Access log
+tail -f /var/log/nginx/ecohealth-error.log   # Error log
 ```
 
 ### What Nginx Does
-- Serves frontend from `/opt/sehat-connect/dist/`
+- Serves frontend from `/opt/ecohealth/dist/`
 - Proxies `/api/` to `http://127.0.0.1:3000` (Node.js backend)
 - Proxies `/health` to `http://127.0.0.1:3000/health`
 - SSL termination with Let's Encrypt
@@ -418,13 +418,13 @@ ufw reload                                 # Reload
 
 | Detail | Value |
 |--------|-------|
-| **URL** | https://github.com/talhakhancom1-cmyk/sehat-connect |
+| **URL** | https://github.com/talhakhancom1-cmyk/ecohealth |
 | **Branch** | `main` |
 | **Access** | Private (SSH deploy key on VPS) |
 
 ### Clone
 ```bash
-git clone git@github.com:talhakhancom1-cmyk/sehat-connect.git
+git clone git@github.com:talhakhancom1-cmyk/ecohealth.git
 ```
 
 ---
@@ -433,12 +433,12 @@ git clone git@github.com:talhakhancom1-cmyk/sehat-connect.git
 
 ### Restart Backend After Code Changes
 ```bash
-pm2 restart sehat-connect-backend
+pm2 restart ecohealth-backend
 ```
 
 ### Rebuild Frontend After Changes
 ```bash
-cd /opt/sehat-connect
+cd /opt/ecohealth
 npm ci                          # Install deps (if node_modules exists)
 npm run build                   # Build to dist/
 # Nginx serves dist/ automatically — no restart needed
@@ -447,25 +447,25 @@ npm run build                   # Build to dist/
 ### Update Backend Code
 ```bash
 # Option 1: Direct edit
-nano /opt/sehat-connect/backend/server.js
-pm2 restart sehat-connect-backend
+nano /opt/ecohealth/backend/server.js
+pm2 restart ecohealth-backend
 
 # Option 2: From git (requires re-clone since .git was removed)
 cd /tmp
-git clone git@github.com:talhakhancom1-cmyk/sehat-connect.git
-cp -r sehat-connect/backend/* /opt/sehat-connect/backend/
-cp sehat-connect/dist/* /opt/sehat-connect/dist/ -r
-pm2 restart sehat-connect-backend
+git clone git@github.com:talhakhancom1-cmyk/ecohealth.git
+cp -r ecohealth/backend/* /opt/ecohealth/backend/
+cp ecohealth/dist/* /opt/ecohealth/dist/ -r
+pm2 restart ecohealth-backend
 ```
 
 ### View Backend Logs
 ```bash
-pm2 logs sehat-connect-backend --lines 100
+pm2 logs ecohealth-backend --lines 100
 ```
 
 ### Check Database Connection
 ```bash
-sudo -u postgres psql -d sehat_connect -c "SELECT 1;"
+sudo -u postgres psql -d ecohealth -c "SELECT 1;"
 ```
 
 ### Check All Services
@@ -479,15 +479,15 @@ pm2 status
 ### Change Admin Password
 ```bash
 # Update .env
-nano /opt/sehat-connect/backend/.env
+nano /opt/ecohealth/backend/.env
 # Change ADMIN_PASSWORD value
 
 # Or directly in database
-sudo -u postgres psql -d sehat_connect
+sudo -u postgres psql -d ecohealth
 # Generate hash first:
 # node -e "console.log(require('bcryptjs').hashSync('newpassword', 12))"
 # Then:
-# UPDATE users SET password_hash='<hash>' WHERE email='admin@sehat.local';
+# UPDATE users SET password_hash='<hash>' WHERE email='admin@ecohealth.local';
 ```
 
 ---
@@ -511,7 +511,7 @@ sudo -u postgres psql -d sehat_connect
 
 ### Backend won't start
 ```bash
-pm2 logs sehat-connect-backend --lines 50
+pm2 logs ecohealth-backend --lines 50
 # Check for missing .env, DB connection, port conflicts
 ```
 
@@ -524,7 +524,7 @@ pm2 logs sehat-connect-backend --lines 50
 ### Database connection failed
 ```bash
 systemctl status postgresql
-sudo -u postgres psql -d sehat_connect -c "SELECT 1;"
+sudo -u postgres psql -d ecohealth -c "SELECT 1;"
 # Check .env DB credentials
 ```
 
@@ -533,7 +533,7 @@ sudo -u postgres psql -d sehat_connect -c "SELECT 1;"
 systemctl status minio
 curl http://127.0.0.1:9000/minio/health/live
 # Check .env MINIO credentials
-mc ls local/sehat-uploads/
+mc ls local/ecohealth-uploads/
 ```
 
 ### SSL certificate expired
@@ -545,4 +545,4 @@ systemctl reload nginx
 ### "Too many requests" error
 - Auth rate limit: 100 requests per 15 minutes per IP
 - General rate limit: 200 requests per minute per IP
-- Wait 15 minutes or restart backend: `pm2 restart sehat-connect-backend`
+- Wait 15 minutes or restart backend: `pm2 restart ecohealth-backend`

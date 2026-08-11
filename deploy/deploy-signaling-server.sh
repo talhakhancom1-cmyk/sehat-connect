@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# Sehat Connect — Signaling Server Deployment Script
+# EcoHealth — Signaling Server Deployment Script
 # For the WebSocket/WebRTC/TURN server (e.g. afridiwins.online):
 #   WebSocket signaling + TURN relay + MinIO (legacy uploads)
 #
@@ -13,9 +13,9 @@
 set -euo pipefail
 
 # ---- Configuration ----
-APP_DIR="${APP_DIR:-/opt/sehat-connect}"
+APP_DIR="${APP_DIR:-/opt/ecohealth}"
 BRANCH="${BRANCH:-main}"
-PM2_NAME="${PM2_NAME:-sehat-connect-backend}"
+PM2_NAME="${PM2_NAME:-ecohealth-backend}"
 HEALTH_URL="${HEALTH_URL:-http://localhost:3000/health}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}"  # seconds to wait for health
 
@@ -50,7 +50,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Sehat Connect — Signaling Server Deploy"
+echo "  EcoHealth — Signaling Server Deploy"
 echo "  App dir:  $APP_DIR"
 echo "  Branch:   $BRANCH"
 echo "  PM2 name: $PM2_NAME"

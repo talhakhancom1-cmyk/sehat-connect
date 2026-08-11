@@ -1,6 +1,6 @@
-# Sehat Connect — Deployment Guide
+# EcoHealth — Deployment Guide
 
-This document covers the full deployment process for Sehat Connect, from
+This document covers the full deployment process for EcoHealth, from
 first-time server setup to routine updates and secret rotation.
 
 ---
@@ -20,7 +20,7 @@ first-time server setup to routine updates and secret rotation.
 
 ## 1. Architecture Overview
 
-Sehat Connect uses a **two-server split architecture**:
+EcoHealth uses a **two-server split architecture**:
 
 | Server | Role | Hosts | Example |
 |--------|------|-------|---------|
@@ -104,8 +104,8 @@ SSH into the app server and run:
 
 ```bash
 # Clone the repo (or upload the deploy scripts)
-git clone https://github.com/talhakhancom1-cmyk/sehat-connect.git /opt/sehat-connect
-cd /opt/sehat-connect
+git clone https://github.com/talhakhancom1-cmyk/ecohealth.git /opt/ecohealth
+cd /opt/ecohealth
 
 # Run the setup script
 sudo DOMAIN=yourdomain.com \
@@ -130,8 +130,8 @@ The script will:
 SSH into the signaling server and run:
 
 ```bash
-git clone https://github.com/talhakhancom1-cmyk/sehat-connect.git /opt/sehat-connect
-cd /opt/sehat-connect
+git clone https://github.com/talhakhancom1-cmyk/ecohealth.git /opt/ecohealth
+cd /opt/ecohealth
 
 # Pass the shared secrets from the app server
 sudo DOMAIN=signaling.example.com \
@@ -157,14 +157,14 @@ with the TURN credentials printed by the signaling server setup:
 
 ```bash
 # On the app server
-sudo nano /opt/sehat-connect/backend/.env
+sudo nano /opt/ecohealth/backend/.env
 # Update:
 #   ICE_TURN_URLS=turn:signaling.example.com:3478
 #   ICE_TURN_USERNAME=<from_signaling_setup>
 #   ICE_TURN_CREDENTIAL=<from_signaling_setup>
 
 # Restart to pick up changes
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 restart ecohealth-backend --update-env
 ```
 
 #### Step 4: Verify
@@ -190,7 +190,7 @@ If you prefer to set up manually, use the env example files as a guide:
 3. Fill in all `<...>` placeholders with real generated values
 4. Ensure shared secrets (`JWT_SECRET`, `FILE_DOWNLOAD_SECRET`, `INTERNAL_API_SECRET`) are identical
 5. Install dependencies: `npm install --production` (backend) + `npm install` (frontend)
-6. Build frontend: `npm run build`
+6. Build frontend: `cd frontend && npm run build`
 7. Start PM2: `pm2 start ecosystem.config.js && pm2 save`
 8. Set up PM2 startup: `pm2 startup` (follow the printed instructions)
 9. Configure Nginx (see the nginx config blocks in the setup scripts)
@@ -203,13 +203,13 @@ If you prefer to set up manually, use the env example files as a guide:
 ### App server
 
 ```bash
-sudo bash /opt/sehat-connect/deploy/deploy-app-server.sh
+sudo bash /opt/ecohealth/deploy/deploy-app-server.sh
 ```
 
 Or manually (the script does exactly this):
 
 ```bash
-cd /opt/sehat-connect
+cd /opt/ecohealth
 git pull origin main
 
 # Install dependencies
@@ -217,10 +217,10 @@ cd backend && npm install --production && cd ..
 npm install
 
 # Build frontend
-npm run build
+cd frontend && npm run build
 
 # Restart backend via PM2 (NEVER use nohup or manual kill)
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 restart ecohealth-backend --update-env
 
 # Verify
 sleep 4
@@ -230,19 +230,19 @@ curl -s https://yourdomain.com/health
 ### Signaling server
 
 ```bash
-sudo bash /opt/sehat-connect/deploy/deploy-signaling-server.sh
+sudo bash /opt/ecohealth/deploy/deploy-signaling-server.sh
 ```
 
 Or manually:
 
 ```bash
-cd /opt/sehat-connect
+cd /opt/ecohealth
 git pull origin main
 
 cd backend && npm install --production
 
 # Restart via PM2
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 restart ecohealth-backend --update-env
 
 # Verify
 sleep 4
@@ -273,7 +273,7 @@ sudo systemctl status coturn
 | `NODE_ENV` | Yes | Set to `production` |
 | `DB_HOST` | Yes | PostgreSQL host (usually `localhost`) |
 | `DB_PORT` | Yes | PostgreSQL port (usually `5432`) |
-| `DB_NAME` | Yes | Database name (default: `sehat_connect`) |
+| `DB_NAME` | Yes | Database name (default: `ecohealth`) |
 | `DB_USER` | Yes | Database user (default: `sehat`) |
 | `DB_PASSWORD` | Yes | Database password |
 | `JWT_SECRET` | Yes | JWT signing secret. **Must match signaling server.** |
@@ -286,7 +286,7 @@ sudo systemctl status coturn
 | `MINIO_USE_SSL` | Yes | `false` for local MinIO |
 | `MINIO_ACCESS_KEY` | Yes | MinIO access key |
 | `MINIO_SECRET_KEY` | Yes | MinIO secret key |
-| `MINIO_BUCKET` | Yes | MinIO bucket name (default: `sehat-uploads`) |
+| `MINIO_BUCKET` | Yes | MinIO bucket name (default: `ecohealth-uploads`) |
 | `MINIO_PUBLIC_BASE_URL` | Yes | Public URL for file access |
 | `INTERNAL_API_SECRET` | Yes | Internal API shared secret. **Must match signaling server.** |
 | `INTERNAL_API_BASE` | No | Leave blank on app server |
@@ -321,10 +321,10 @@ NEW_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
 sudo -u postgres psql -c "ALTER USER sehat WITH PASSWORD '$NEW_PASS';"
 
 # 3. Update .env on this server
-sudo sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$NEW_PASS/" /opt/sehat-connect/backend/.env
+sudo sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$NEW_PASS/" /opt/ecohealth/backend/.env
 
 # 4. Restart PM2 to pick up the new password
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 restart ecohealth-backend --update-env
 
 # 5. Verify health
 sleep 4
@@ -346,12 +346,12 @@ NEW_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('he
 
 # 2. Update .env on BOTH servers
 # On the app server:
-sudo sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$NEW_SECRET/" /opt/sehat-connect/backend/.env
-sudo pm2 restart sehat-connect-backend --update-env
+sudo sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$NEW_SECRET/" /opt/ecohealth/backend/.env
+sudo pm2 restart ecohealth-backend --update-env
 
 # On the signaling server:
-sudo sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$NEW_SECRET/" /opt/sehat-connect/backend/.env
-sudo pm2 restart sehat-connect-backend --update-env
+sudo sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$NEW_SECRET/" /opt/ecohealth/backend/.env
+sudo pm2 restart ecohealth-backend --update-env
 
 # 3. Verify both health checks
 curl -s https://yourdomain.com/health
@@ -387,8 +387,8 @@ sudo sed -i "s/^user=.*/user=sehat:$NEW_TURN_PASS/" /etc/turnserver.conf
 sudo systemctl restart coturn
 
 # 3. Update .env on BOTH servers
-sudo sed -i "s/^ICE_TURN_CREDENTIAL=.*/ICE_TURN_CREDENTIAL=$NEW_TURN_PASS/" /opt/sehat-connect/backend/.env
-sudo pm2 restart sehat-connect-backend --update-env
+sudo sed -i "s/^ICE_TURN_CREDENTIAL=.*/ICE_TURN_CREDENTIAL=$NEW_TURN_PASS/" /opt/ecohealth/backend/.env
+sudo pm2 restart ecohealth-backend --update-env
 ```
 
 ---
@@ -411,9 +411,9 @@ curl -s https://signaling.example.com/health
 
 ```bash
 sudo pm2 status
-# Expected: sehat-connect-backend is "online" with 0 restarts
+# Expected: ecohealth-backend is "online" with 0 restarts
 
-sudo pm2 logs sehat-connect-backend --lines 20 --nostream
+sudo pm2 logs ecohealth-backend --lines 20 --nostream
 # Look for: "Server running on port 3000" and "Database synchronized successfully"
 ```
 
@@ -445,7 +445,7 @@ turnutils_stunclient <SIGNALING_SERVER_DOMAIN>
 ```bash
 sudo nginx -t          # Test config
 sudo systemctl status nginx
-sudo tail -20 /var/log/nginx/sehat-connect-error.log
+sudo tail -20 /var/log/nginx/ecohealth-error.log
 ```
 
 ### Log locations
@@ -454,9 +454,9 @@ sudo tail -20 /var/log/nginx/sehat-connect-error.log
 |-----|------|
 | PM2 stdout | `backend/logs/out.log` |
 | PM2 stderr | `backend/logs/error.log` |
-| PM2 (via pm2 logs) | `~/.pm2/logs/sehat-connect-backend-out.log` |
-| Nginx access | `/var/log/nginx/sehat-connect-access.log` |
-| Nginx error | `/var/log/nginx/sehat-connect-error.log` |
+| PM2 (via pm2 logs) | `~/.pm2/logs/ecohealth-backend-out.log` |
+| Nginx access | `/var/log/nginx/ecohealth-access.log` |
+| Nginx error | `/var/log/nginx/ecohealth-error.log` |
 | PostgreSQL | `/var/log/postgresql/postgresql-*.log` |
 | coturn | `/var/log/turnserver.log` |
 
@@ -482,8 +482,8 @@ sudo ss -tlnp | grep 3000
 sudo kill <PID>
 
 # 3. If PM2 lost track of the process, delete and recreate it
-sudo pm2 delete sehat-connect-backend
-cd /opt/sehat-connect/backend
+sudo pm2 delete ecohealth-backend
+cd /opt/ecohealth/backend
 sudo pm2 start ecosystem.config.js
 sudo pm2 save
 
@@ -513,14 +513,14 @@ non-root user. Each user has their own PM2 process list.
 # Always use sudo with pm2
 sudo pm2 list
 sudo pm2 status
-sudo pm2 logs sehat-connect-backend
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 logs ecohealth-backend
+sudo pm2 restart ecohealth-backend --update-env
 ```
 
 If the process genuinely doesn't exist:
 
 ```bash
-cd /opt/sehat-connect/backend
+cd /opt/ecohealth/backend
 sudo pm2 start ecosystem.config.js
 sudo pm2 save
 ```
@@ -538,7 +538,7 @@ after the last process change.
 
 ```bash
 # 1. Start the process
-cd /opt/sehat-connect/backend
+cd /opt/ecohealth/backend
 sudo pm2 start ecosystem.config.js
 
 # 2. Save the process list
@@ -570,10 +570,10 @@ can be created.
 
 ```bash
 # Check the full migration logs
-sudo pm2 logs sehat-connect-backend --lines 50 --nostream | grep -i migrat
+sudo pm2 logs ecohealth-backend --lines 50 --nostream | grep -i migrat
 
 # Check which indexes exist
-sudo -u postgres psql -d sehat_connect -c "\di"
+sudo -u postgres psql -d ecohealth -c "\di"
 # Expected indexes:
 #   uq_appointment_active_slot
 #   uq_callroom_active
@@ -626,15 +626,15 @@ the signaling server tries to verify with a different JWT_SECRET.
 
 ```bash
 # Check JWT_SECRET on both servers
-sudo grep JWT_SECRET /opt/sehat-connect/backend/.env
+sudo grep JWT_SECRET /opt/ecohealth/backend/.env
 
 # They must be identical. If not, copy the app server's value
 # to the signaling server and restart:
 
 # On the signaling server:
-sudo nano /opt/sehat-connect/backend/.env
+sudo nano /opt/ecohealth/backend/.env
 # Set JWT_SECRET to the app server's value
-sudo pm2 restart sehat-connect-backend --update-env
+sudo pm2 restart ecohealth-backend --update-env
 ```
 
 ---
@@ -650,7 +650,7 @@ file is on the other server's MinIO instance.
 
 ```bash
 # Check FILE_DOWNLOAD_SECRET on both servers
-sudo grep FILE_DOWNLOAD_SECRET /opt/sehat-connect/backend/.env
+sudo grep FILE_DOWNLOAD_SECRET /opt/ecohealth/backend/.env
 
 # They must be identical. If not, sync them and restart.
 ```
@@ -668,7 +668,7 @@ server logs show 401 from `/internal/` endpoints.
 
 ```bash
 # Check on both servers
-sudo grep INTERNAL_API_SECRET /opt/sehat-connect/backend/.env
+sudo grep INTERNAL_API_SECRET /opt/ecohealth/backend/.env
 
 # They must be identical. Sync and restart both.
 ```
@@ -690,7 +690,7 @@ hashes in filenames, so this is usually a service worker cache issue.
 # Chrome DevTools > Application > Service Workers > Unregister
 
 # On the server, verify the new build is in place:
-ls -la /opt/sehat-connect/dist/assets/
+ls -la /opt/ecohealth/frontend/dist/assets/
 # Check the timestamps are recent
 ```
 
@@ -761,11 +761,11 @@ sudo certbot --nginx -d yourdomain.com
 | Set up signaling server (fresh) | `sudo bash deploy/setup-signaling-server.sh` |
 | Check health | `curl -s https://<domain>/health` |
 | PM2 status | `sudo pm2 status` |
-| PM2 logs | `sudo pm2 logs sehat-connect-backend --lines 30` |
-| PM2 error logs | `sudo pm2 logs sehat-connect-backend --err --lines 50 --nostream` |
-| Restart backend | `sudo pm2 restart sehat-connect-backend --update-env` |
+| PM2 logs | `sudo pm2 logs ecohealth-backend --lines 30` |
+| PM2 error logs | `sudo pm2 logs ecohealth-backend --err --lines 50 --nostream` |
+| Restart backend | `sudo pm2 restart ecohealth-backend --update-env` |
 | Nginx status | `sudo systemctl status nginx` |
 | Nginx reload | `sudo nginx -t && sudo systemctl reload nginx` |
 | coturn status | `sudo systemctl status coturn` |
-| PostgreSQL shell | `sudo -u postgres psql -d sehat_connect` |
+| PostgreSQL shell | `sudo -u postgres psql -d ecohealth` |
 | Check port 3000 | `sudo ss -tlnp \| grep 3000` |

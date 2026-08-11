@@ -174,7 +174,7 @@ router.post('/', async (req, res) => {
       smtp_secure: body.smtp_secure !== undefined ? !!body.smtp_secure : (parseInt(body.smtp_port, 10) === 465),
       smtp_username: body.smtp_username.trim(),
       from_email: body.from_email.trim(),
-      from_name: body.from_name || 'Sehat Connect',
+      from_name: body.from_name || 'EcoHealth',
       reply_to: body.reply_to || null,
       enable_password_reset: body.enable_password_reset !== false,
       enable_signup_otp: !!body.enable_signup_otp,
@@ -233,11 +233,11 @@ router.post('/test', async (req, res) => {
 
     const result = await sendEmail({
       to: testEmail,
-      subject: 'Sehat Connect — Test Email',
+      subject: 'EcoHealth — Test Email',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #4f46e5;">Test Email Successful!</h2>
-          <p>This is a test email from Sehat Connect. If you're seeing this, your SMTP configuration is working correctly.</p>
+          <p>This is a test email from EcoHealth. If you're seeing this, your SMTP configuration is working correctly.</p>
           <table style="width: 100%; margin: 20px 0;">
             <tr><td style="padding: 4px 0; color: #666;">SMTP Host:</td><td>${config.smtp_host}</td></tr>
             <tr><td style="padding: 4px 0; color: #666;">Port:</td><td>${config.smtp_port}</td></tr>

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# Sehat Connect — App Server Deployment Script
+# EcoHealth — App Server Deployment Script
 # For the main app server (e.g. ehcserver.webfrat.com):
 #   frontend + REST API + PostgreSQL + MinIO
 #
@@ -8,7 +8,7 @@
 #   sudo bash deploy/deploy-app-server.sh
 #
 # Or from the app directory:
-#   sudo bash /opt/sehat-connect/deploy/deploy-app-server.sh
+#   sudo bash /opt/ecohealth/deploy/deploy-app-server.sh
 #
 # This script is IDEMPOTENT — safe to run multiple times.
 # It NEVER uses nohup, manual kill, or fuser. Only PM2 commands.
@@ -16,9 +16,9 @@
 set -euo pipefail
 
 # ---- Configuration ----
-APP_DIR="${APP_DIR:-/opt/sehat-connect}"
+APP_DIR="${APP_DIR:-/opt/ecohealth}"
 BRANCH="${BRANCH:-main}"
-PM2_NAME="${PM2_NAME:-sehat-connect-backend}"
+PM2_NAME="${PM2_NAME:-ecohealth-backend}"
 HEALTH_URL="${HEALTH_URL:-http://localhost:3000/health}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}"  # seconds to wait for health
 
@@ -53,7 +53,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Sehat Connect — App Server Deploy"
+echo "  EcoHealth — App Server Deploy"
 echo "  App dir:  $APP_DIR"
 echo "  Branch:   $BRANCH"
 echo "  PM2 name: $PM2_NAME"
@@ -80,7 +80,7 @@ npm install --production 2>&1 | tail -3
 ok "Backend dependencies installed."
 
 # Frontend
-cd "$APP_DIR"
+cd "$APP_DIR/frontend"
 npm install 2>&1 | tail -3
 ok "Frontend dependencies installed."
 
@@ -88,16 +88,16 @@ ok "Frontend dependencies installed."
 # STEP 3: Build frontend
 # ================================================================
 info "Step 3/6: Building frontend..."
-cd "$APP_DIR"
+cd "$APP_DIR/frontend"
 
 # Ensure .env.production exists (Vite needs it for the API base URL)
-if [ ! -f "$APP_DIR/.env.production" ]; then
+if [ ! -f "$APP_DIR/frontend/.env.production" ]; then
   warn ".env.production not found. Creating with default /api base."
-  echo "VITE_API_BASE_URL=/api" > "$APP_DIR/.env.production"
+  echo "VITE_API_BASE_URL=/api" > "$APP_DIR/frontend/.env.production"
 fi
 
 npm run build 2>&1 | tail -5
-ok "Frontend built to $APP_DIR/dist/"
+ok "Frontend built to $APP_DIR/frontend/dist/"
 
 # ================================================================
 # STEP 4: Restart backend via PM2 (safe pattern)

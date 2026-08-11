@@ -1,7 +1,7 @@
 {
-  "name": "sehat-connect-backend",
+  "name": "ecohealth-backend",
   "version": "1.0.0",
-  "description": "Sehat Connect Backend API",
+  "description": "EcoHealth Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

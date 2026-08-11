@@ -1,5 +1,5 @@
 /**
- * Background job scheduler for Sehat Connect.
+ * Background job scheduler for EcoHealth.
  *
  * Uses node-cron for periodic tasks:
  *   - Appointment reminders (24h and 1h before)

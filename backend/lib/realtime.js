@@ -1,5 +1,5 @@
 /**
- * Real-time WebSocket server (Socket.IO) for Sehat Connect.
+ * Real-time WebSocket server (Socket.IO) for EcoHealth.
  *
  * Implements the documented event contract from socketEvents.js:
  *   - conversation:join / conversation:leave

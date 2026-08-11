@@ -11,7 +11,7 @@ export const generatePrescriptionPdf = (presc) => {
   // Header
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('SehatConnect', M, y);
+  doc.text('EcoHealth', M, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text('Digital Prescription', W - M, y, { align: 'right' });

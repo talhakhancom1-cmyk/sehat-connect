@@ -22,7 +22,7 @@ const s3Client = new S3Client({
   forcePathStyle: true, // Required for MinIO (path-style, not virtual-host)
 });
 
-const BUCKET = process.env.MINIO_BUCKET || 'sehat-uploads';
+const BUCKET = process.env.MINIO_BUCKET || 'ecohealth-uploads';
 const PUBLIC_BASE_URL = process.env.MINIO_PUBLIC_BASE_URL || '';
 
 // Ensure the bucket exists on startup

@@ -1,5 +1,5 @@
 /**
- * Notification dispatcher for Sehat Connect.
+ * Notification dispatcher for EcoHealth.
  *
  * Reads pending Notification rows and delivers them via the appropriate channel:
  *   - In-app: always (via Socket.IO if user is online, else stored in DB)

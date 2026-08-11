@@ -1,5 +1,5 @@
 /**
- * Email service for Sehat Connect.
+ * Email service for EcoHealth.
  *
  * Uses nodemailer with SMTP settings stored in the EmailConfig table.
  * The admin panel configures the SMTP provider (Gmail, SendGrid, SES, Mailgun, etc.)
@@ -169,7 +169,7 @@ async function sendPasswordResetEmail(toEmail, resetUrl, resetToken) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <h2 style="color: #4f46e5;">Password Reset Request</h2>
-      <p>You requested a password reset for your Sehat Connect account.</p>
+      <p>You requested a password reset for your EcoHealth account.</p>
       <p>Click the button below to reset your password. This link expires in 1 hour.</p>
       <p style="text-align: center; margin: 30px 0;">
         <a href="${resetUrl}" style="background: #4f46e5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
@@ -181,7 +181,7 @@ async function sendPasswordResetEmail(toEmail, resetUrl, resetToken) {
   `;
   return sendEmail({
     to: toEmail,
-    subject: 'Reset your Sehat Connect password',
+    subject: 'Reset your EcoHealth password',
     html,
   });
 }
@@ -196,7 +196,7 @@ async function sendSignupOtpEmail(toEmail, otpCode) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <h2 style="color: #4f46e5;">Verify Your Email</h2>
-      <p>Welcome to Sehat Connect! Use the code below to verify your email address.</p>
+      <p>Welcome to EcoHealth! Use the code below to verify your email address.</p>
       <p style="text-align: center; margin: 30px 0;">
         <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #4f46e5;">${otpCode}</span>
       </p>
@@ -207,7 +207,7 @@ async function sendSignupOtpEmail(toEmail, otpCode) {
   `;
   return sendEmail({
     to: toEmail,
-    subject: 'Your Sehat Connect verification code',
+    subject: 'Your EcoHealth verification code',
     html,
   });
 }

@@ -55,7 +55,7 @@ export default function Sidebar({ role = 'patient' }) {
             <Activity className="w-4 h-4 text-primary" strokeWidth={2.5} />
           </div>
           <div>
-            <p className="text-sm font-bold tracking-tight">Sehat<span className="text-primary">.</span></p>
+            <p className="text-sm font-bold tracking-tight">EcoHealth<span className="text-primary">.</span></p>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{role} portal</p>
           </div>
         </Link>

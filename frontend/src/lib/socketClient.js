@@ -1,5 +1,5 @@
 /**
- * Socket.IO client singleton for Sehat Connect real-time features
+ * Socket.IO client singleton for EcoHealth real-time features
  * (chat messages, typing indicators, read receipts, call signaling).
  *
  * Mirrors the event contract implemented by backend/lib/realtime.js.

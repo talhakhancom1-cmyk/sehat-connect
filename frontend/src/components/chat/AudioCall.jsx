@@ -6,7 +6,7 @@ import { useWebRTCCall } from '@/lib/useWebRTCCall';
 // that still import buildCallRoomName — the new system uses CallRoom ids
 // from the signaling server, but we keep this export so existing imports work.
 export function buildCallRoomName(conversationId) {
-  return `sehatconnectvoice${String(conversationId || 'call').replace(/[^a-zA-Z0-9]/g, '')}`;
+  return `EcoHealthvoice${String(conversationId || 'call').replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 
 /**

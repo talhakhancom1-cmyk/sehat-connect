@@ -1,4 +1,4 @@
-# Sehat Connect — Eco Health Cloud
+# EcoHealth — Eco Health Cloud
 
 A global, patient-owned healthcare operating platform. This repository contains the web/PWA client and the shared backend.
 
@@ -59,7 +59,7 @@ PORT=3000
 NODE_ENV=development
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=sehat_connect
+DB_NAME=ecohealth
 DB_USER=postgres
 DB_PASSWORD=your_password
 JWT_SECRET=your_secret
@@ -69,7 +69,7 @@ MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=your_key
 MINIO_SECRET_KEY=your_secret
-MINIO_BUCKET=sehat-uploads
+MINIO_BUCKET=ecohealth-uploads
 REDIS_URL=redis://localhost:6379
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=your_password
@@ -88,8 +88,8 @@ See `DEPLOYMENT_GUIDE.md` for full VPS deployment instructions.
 Quick deploy on a fresh Ubuntu VPS:
 
 ```bash
-git clone https://github.com/talhakhancom1-cmyk/sehat-connect.git /tmp/sehat-deploy
-cd /tmp/sehat-deploy
+git clone https://github.com/talhakhancom1-cmyk/ecohealth.git /tmp/ecohealth-deploy
+cd /tmp/ecohealth-deploy
 sudo DOMAIN=yourdomain.com bash deploy.sh
 ```
 

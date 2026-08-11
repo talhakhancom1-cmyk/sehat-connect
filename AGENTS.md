@@ -2,7 +2,7 @@
 
 ## Project Context
 
-Eco Health Cloud (Sehat) is a global, patient-owned healthcare operating platform. This repository contains the **Website / PWA client** and the **shared backend**. Per the Engineering Bible, all four clients (Website, Windows, iOS, Android) present the same backend and the same PostgreSQL database through the same API — there is one backend, one database, and multiple presentation layers.
+EcoHealth Cloud is a global, patient-owned healthcare operating platform. This repository contains the **Website / PWA client** and the **shared backend**. Per the Engineering Bible, all four clients (Website, Windows, iOS, Android) present the same backend and the same PostgreSQL database through the same API — there is one backend, one database, and multiple presentation layers.
 
 The project runs as a standalone Vite frontend + Express/Sequelize backend.
 
@@ -16,9 +16,43 @@ The project runs as a standalone Vite frontend + Express/Sequelize backend.
 - **Storage / Payments / Calls**: intentionally abstracted so each can be wired to country-specific providers.
 - **Security**: Helmet, rate limiting, JWT auth, bcrypt, session revocation, audit logging.
 
+## Repository Structure
+
+```
+ecohealth/
+├── frontend/          # React + Vite PWA client
+│   ├── src/           # Frontend source code
+│   ├── public/        # Static assets
+│   ├── index.html     # Vite entry point
+│   ├── vite.config.js # Vite config with path aliases
+│   ├── package.json   # Frontend dependencies
+│   └── .env.local     # Frontend dev env vars
+├── backend/           # Node.js + Express + Sequelize API
+│   ├── server.js      # Express server, database sync, admin seeding
+│   ├── models/        # Sequelize models
+│   ├── routes/        # Express route handlers
+│   ├── lib/           # Shared libraries (auth, realtime, scheduler, etc.)
+│   ├── config/        # Database and MinIO config
+│   ├── middleware/    # Auth and validation middleware
+│   ├── ecosystem.config.js  # PM2 process config
+│   └── env.example    # Backend env template
+├── webrtc/            # Documentation for WebRTC/signaling components
+│   └── README.md      # Architecture and key file reference
+├── deploy/            # Deployment scripts and env templates
+│   ├── deploy-app-server.sh
+│   ├── deploy-signaling-server.sh
+│   ├── setup-app-server.sh
+│   ├── setup-signaling-server.sh
+│   ├── env.app-server.example
+│   └── env.signaling-server.example
+├── DEPLOYMENT.md      # Full deployment guide
+├── AGENTS.md          # This file
+└── package.json       # Root workspace config
+```
+
 ## Key Files
 
-- `src/`: web application source.
+- `frontend/src/`: web application source.
 - `backend/`: shared backend source.
 - `backend/models/User.js`: canonical EHC role model (Section 4).
 - `backend/server.js`: Express server, database sync, admin seeding.
@@ -26,24 +60,23 @@ The project runs as a standalone Vite frontend + Express/Sequelize backend.
 - `backend/config/minio.js`: MinIO (S3) client for file storage.
 - `backend/middleware/auth.js`: JWT authentication + role checks.
 - `backend/lib/parseSort.js`: shared sort parameter parser.
-- `src/lib/useRole.js`: frontend role helpers using the canonical EHC roles.
-- `src/api/base44Client.js`: frontend API client that routes to the backend.
-- `vite.config.js`: Vite config with path aliases.
-- `.env.local` (root): frontend dev env vars.
-- `.env.production` (root): frontend prod env vars (VITE_API_BASE_URL).
+- `frontend/src/lib/useRole.js`: frontend role helpers using the canonical EHC roles.
+- `frontend/src/api/base44Client.js`: frontend API client that routes to the backend.
+- `frontend/vite.config.js`: Vite config with path aliases.
+- `frontend/.env.local`: frontend dev env vars.
+- `frontend/.env.production`: frontend prod env vars (VITE_API_BASE_URL).
 - `backend/env.example`: backend env template.
 - `backend/ecosystem.config.js`: PM2 process config.
-- `backend/nginx.conf`: Nginx site config for production.
-- `deploy.sh`: VPS deployment script for Ubuntu 26.
+- `deploy/`: deployment scripts and env templates.
 
 ## Working Notes
 
-- Use `npm run dev:both` to start the Vite frontend and Express backend together.
+- Use `npm run dev:both` (from `frontend/`) to start the Vite frontend and Express backend together.
 - Backend-only work: `cd backend && npm run dev` (nodemon) or `node server.js`.
-- Frontend-only work: `npm run dev`.
+- Frontend-only work: `cd frontend && npm run dev`.
 - The API base is `/api` (relative, proxied by Vite in dev and Nginx in prod).
 - The canonical role set is: `patient`, `head_of_household`, `doctor`, `caregiver`, `clinic_admin`, `support_agent`, `compliance_auditor`, `super_admin`.
-- Run checks from `package.json` before finishing code changes (`npm run lint`, `npm run build`).
+- Run checks from `frontend/package.json` before finishing code changes (`cd frontend && npm run lint`, `cd frontend && npm run build`).
 
 ## Verification
 
@@ -58,7 +91,7 @@ The project runs as a standalone Vite frontend + Express/Sequelize backend.
   - **afridiwins.online** (74.208.36.213): WebSocket signaling server + TURN server + MinIO (old uploads).
 - **SSH access**: key-based only (`~/.ssh/id_ed25519`). Password auth disabled.
 - **Deploy**: `bash deploy.sh` from the project root on the VPS.
-- **Process manager**: PM2 (`pm2 status`, `pm2 logs sehat-connect-backend`).
+- **Process manager**: PM2 (`pm2 status`, `pm2 logs ecohealth-backend`).
 - **Reverse proxy**: Nginx serves the built frontend and proxies `/api/` to the backend.
 - **SSL**: Certbot/Let's Encrypt.
 

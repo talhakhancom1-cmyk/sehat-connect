@@ -113,11 +113,11 @@ router.post('/:id/reset-password', authenticate, requirePermission('can_reset_pa
     // Email the temporary password to the user
     const emailResult = await sendEmail({
       to: target.email,
-      subject: 'Your password has been reset — Sehat Connect',
+      subject: 'Your password has been reset — EcoHealth',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #4f46e5;">Password Reset</h2>
-          <p>An administrator has reset your Sehat Connect account password.</p>
+          <p>An administrator has reset your EcoHealth account password.</p>
           <p>Your temporary password is:</p>
           <p style="text-align: center; margin: 20px 0;">
             <span style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #4f46e5; background: #f3f4f6; padding: 12px 24px; border-radius: 8px;">${tempPassword}</span>

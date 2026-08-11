@@ -3,7 +3,7 @@ require('dotenv').config({ path: '.env' });
 
 // Simple database configuration
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'sehat_connect',
+  process.env.DB_NAME || 'ecohealth',
   process.env.DB_USER || 'postgres',
   process.env.DB_PASSWORD || null,
   {
@@ -69,14 +69,14 @@ const createDatabase = async () => {
       const [results] = await sequelizeForCreation.query(
         "SELECT 1 FROM pg_database WHERE datname = $1",
         {
-          bind: [process.env.DB_NAME || 'sehat_connect'],
+          bind: [process.env.DB_NAME || 'ecohealth'],
           type: Sequelize.QueryTypes.SELECT
         }
       );
 
       if (!results || results.length === 0) {
         // Database doesn't exist, create it
-        await sequelizeForCreation.query(`CREATE DATABASE ${process.env.DB_NAME || 'sehat_connect'};`);
+        await sequelizeForCreation.query(`CREATE DATABASE ${process.env.DB_NAME || 'ecohealth'};`);
         console.log('✅ Database created successfully');
       } else {
         console.log('✅ Database already exists');

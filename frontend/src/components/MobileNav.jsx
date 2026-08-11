@@ -59,7 +59,7 @@ export default function MobileNav({ role = 'patient' }) {
                 <Activity className="w-5 h-5 text-primary" strokeWidth={2.5} />
               </div>
               <div>
-                <p className="text-[15px] font-bold tracking-tight leading-none">Sehat<span className="text-primary">.</span></p>
+                <p className="text-[15px] font-bold tracking-tight leading-none">EcoHealth<span className="text-primary">.</span></p>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">{role} portal</p>
               </div>
             </Link>

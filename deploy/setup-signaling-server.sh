@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# Sehat Connect — First-Time Signaling Server Setup
+# EcoHealth — First-Time Signaling Server Setup
 # For a FRESH Ubuntu 22/24/26 VPS that will serve as the
 # WebSocket/WebRTC/TURN signaling server.
 #
@@ -31,10 +31,10 @@ set -euo pipefail
 # ---- Configuration ----
 DOMAIN="${DOMAIN:-}"
 APP_SERVER_DOMAIN="${APP_SERVER_DOMAIN:-}"
-DB_NAME="${DB_NAME:-sehat_connect}"
+DB_NAME="${DB_NAME:-ecohealth}"
 DB_USER="${DB_USER:-sehat}"
-APP_DIR="/opt/sehat-connect"
-REPO_URL="${REPO_URL:-https://github.com/talhakhancom1-cmyk/sehat-connect.git}"
+APP_DIR="/opt/ecohealth"
+REPO_URL="${REPO_URL:-https://github.com/talhakhancom1-cmyk/ecohealth.git}"
 BRANCH="${BRANCH:-main}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 
@@ -64,7 +64,7 @@ fi
 if [ -z "$DOMAIN" ]; then
   echo ""
   echo "=========================================="
-  echo "  Sehat Connect — Signaling Server Setup"
+  echo "  EcoHealth — Signaling Server Setup"
   echo "=========================================="
   read -p "  Enter this server's domain (e.g. afridiwins.online): " DOMAIN
   if [ -z "$DOMAIN" ]; then fail "Domain is required."; fi
@@ -97,7 +97,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Sehat Connect — Signaling Server Setup"
+echo "  EcoHealth — Signaling Server Setup"
 echo "  Domain:           $DOMAIN"
 echo "  App server:       $APP_SERVER_DOMAIN"
 echo "  App dir:          $APP_DIR"
@@ -212,8 +212,8 @@ systemctl restart minio
 sleep 3
 
 export MC_HOST_local="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000"
-/usr/local/bin/mc mb local/sehat-uploads 2>/dev/null || true
-/usr/local/bin/mc anonymous set download local/sehat-uploads 2>/dev/null || true
+/usr/local/bin/mc mb local/ecohealth-uploads 2>/dev/null || true
+/usr/local/bin/mc anonymous set download local/ecohealth-uploads 2>/dev/null || true
 unset MC_HOST_local
 
 ok "MinIO ready on port 9000"
@@ -231,7 +231,7 @@ TURN_REALM="$DOMAIN"
 sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null || true
 
 cat > /etc/turnserver.conf <<TURNEOF
-# coturn TURN server config for Sehat Connect
+# coturn TURN server config for EcoHealth
 listening-port=3478
 listening-ip=0.0.0.0
 external-ip=\$(detect-external-ip)
@@ -318,7 +318,7 @@ MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
 MINIO_SECRET_KEY=$MINIO_SECRET_KEY
-MINIO_BUCKET=sehat-uploads
+MINIO_BUCKET=ecohealth-uploads
 MINIO_PUBLIC_BASE_URL=https://$DOMAIN/files
 
 # ---- Internal service-to-service API ----
@@ -369,7 +369,7 @@ ok "PM2 started and configured to start on boot."
 # ================================================================
 info "Step 9/10: Configuring Nginx..."
 
-NGINX_SITE="/etc/nginx/sites-available/sehat-connect"
+NGINX_SITE="/etc/nginx/sites-available/ecohealth"
 
 # Phase 1: HTTP-only (for certbot)
 cat > "$NGINX_SITE" <<HTTPONLY
@@ -410,7 +410,7 @@ server {
 }
 HTTPONLY
 
-ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/sehat-connect
+ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/ecohealth
 rm -f /etc/nginx/sites-enabled/default
 
 nginx -t 2>&1
@@ -499,14 +499,14 @@ server {
 
     # MinIO file proxy (legacy uploads)
     location /files/ {
-        proxy_pass http://127.0.0.1:9000/sehat-uploads/;
+        proxy_pass http://127.0.0.1:9000/ecohealth-uploads/;
         proxy_set_header Host \$host;
     }
 
     client_max_body_size 30m;
 
-    access_log /var/log/nginx/sehat-connect-access.log;
-    error_log /var/log/nginx/sehat-connect-error.log;
+    access_log /var/log/nginx/ecohealth-access.log;
+    error_log /var/log/nginx/ecohealth-error.log;
 }
 NGINXEOF
 
@@ -534,7 +534,7 @@ done
 if [ "$HEALTH_OK" = true ]; then
   ok "Health check passed!"
 else
-  warn "Health check failed. Check: sudo pm2 logs sehat-connect-backend --lines 30"
+  warn "Health check failed. Check: sudo pm2 logs ecohealth-backend --lines 30"
 fi
 
 # ================================================================

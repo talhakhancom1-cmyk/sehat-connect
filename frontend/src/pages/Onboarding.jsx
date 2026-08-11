@@ -204,7 +204,7 @@ export default function Onboarding() {
         title: 'Profile saved!',
         description: role === 'doctor'
           ? 'Your profile is pending PMDC verification.'
-          : 'Welcome to Sehat Connect!'
+          : 'Welcome to EcoHealth!'
       });
       window.location.href = role === 'doctor' ? '/doctor' : '/';
     } catch (err) {
@@ -475,7 +475,7 @@ export default function Onboarding() {
         </Button>
       </form>
       <p className="text-center text-xs text-muted-foreground mt-6">
-        Powered by <span className="font-semibold text-foreground">Sehat Connect</span>
+        Powered by <span className="font-semibold text-foreground">EcoHealth</span>
       </p>
     </AuthLayout>
   );

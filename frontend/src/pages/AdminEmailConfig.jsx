@@ -80,7 +80,7 @@ export default function AdminEmailConfig() {
     smtp_username: '',
     smtp_password: '',
     from_email: '',
-    from_name: 'Sehat Connect',
+    from_name: 'EcoHealth',
     reply_to: '',
     enable_password_reset: true,
     enable_signup_otp: false,
@@ -112,7 +112,7 @@ export default function AdminEmailConfig() {
           smtp_username: data.smtp_username || '',
           smtp_password: '', // never pre-fill password
           from_email: data.from_email || '',
-          from_name: data.from_name || 'Sehat Connect',
+          from_name: data.from_name || 'EcoHealth',
           reply_to: data.reply_to || '',
           enable_password_reset: data.enable_password_reset ?? true,
           enable_signup_otp: data.enable_signup_otp ?? false,
@@ -396,7 +396,7 @@ export default function AdminEmailConfig() {
                     id="from_name"
                     value={form.from_name}
                     onChange={(e) => update('from_name', e.target.value)}
-                    placeholder="Sehat Connect"
+                    placeholder="EcoHealth"
                   />
                 </div>
               </div>

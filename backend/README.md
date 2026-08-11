@@ -1,6 +1,6 @@
-# Sehat Connect Backend
+# EcoHealth Backend
 
-Node.js + Express + Sequelize backend for the Sehat Connect healthcare platform.
+Node.js + Express + Sequelize backend for the EcoHealth healthcare platform.
 
 ## Architecture
 

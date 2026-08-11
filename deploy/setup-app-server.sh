@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# Sehat Connect — First-Time App Server Setup
+# EcoHealth — First-Time App Server Setup
 # For a FRESH Ubuntu 22/24/26 VPS that will serve as the main app server
 # (frontend + REST API + PostgreSQL + MinIO).
 #
@@ -31,10 +31,10 @@ set -euo pipefail
 DOMAIN="${DOMAIN:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
-DB_NAME="${DB_NAME:-sehat_connect}"
+DB_NAME="${DB_NAME:-ecohealth}"
 DB_USER="${DB_USER:-sehat}"
-APP_DIR="/opt/sehat-connect"
-REPO_URL="${REPO_URL:-https://github.com/talhakhancom1-cmyk/sehat-connect.git}"
+APP_DIR="/opt/ecohealth"
+REPO_URL="${REPO_URL:-https://github.com/talhakhancom1-cmyk/ecohealth.git}"
 BRANCH="${BRANCH:-main}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 
@@ -59,7 +59,7 @@ fi
 if [ -z "$DOMAIN" ]; then
   echo ""
   echo "=========================================="
-  echo "  Sehat Connect — App Server Setup"
+  echo "  EcoHealth — App Server Setup"
   echo "=========================================="
   read -p "  Enter your domain (e.g. example.com): " DOMAIN
   if [ -z "$DOMAIN" ]; then fail "Domain is required."; fi
@@ -76,7 +76,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Sehat Connect — App Server Setup"
+echo "  EcoHealth — App Server Setup"
 echo "  Domain:       $DOMAIN"
 echo "  Admin email:  $ADMIN_EMAIL"
 echo "  App dir:      $APP_DIR"
@@ -199,11 +199,11 @@ sleep 3
 
 # Create bucket
 export MC_HOST_local="http://$MINIO_ACCESS_KEY:$MINIO_SECRET_KEY@localhost:9000"
-/usr/local/bin/mc mb local/sehat-uploads 2>/dev/null || true
-/usr/local/bin/mc anonymous set download local/sehat-uploads 2>/dev/null || true
+/usr/local/bin/mc mb local/ecohealth-uploads 2>/dev/null || true
+/usr/local/bin/mc anonymous set download local/ecohealth-uploads 2>/dev/null || true
 unset MC_HOST_local
 
-ok "MinIO ready on port 9000 (bucket: sehat-uploads)"
+ok "MinIO ready on port 9000 (bucket: ecohealth-uploads)"
 
 # ================================================================
 # STEP 5: Clone repository
@@ -266,7 +266,7 @@ MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
 MINIO_SECRET_KEY=$MINIO_SECRET_KEY
-MINIO_BUCKET=sehat-uploads
+MINIO_BUCKET=ecohealth-uploads
 MINIO_PUBLIC_BASE_URL=https://$DOMAIN/files
 
 # ---- Internal service-to-service API ----
@@ -300,7 +300,7 @@ cd "$APP_DIR/backend"
 npm install --production 2>&1 | tail -3
 ok "Backend dependencies installed."
 
-cd "$APP_DIR"
+cd "$APP_DIR/frontend"
 npm install 2>&1 | tail -3
 ok "Frontend dependencies installed."
 
@@ -309,17 +309,17 @@ ok "Frontend dependencies installed."
 # ================================================================
 info "Step 8/12: Building frontend..."
 
-cd "$APP_DIR"
+cd "$APP_DIR/frontend"
 echo "VITE_API_BASE_URL=/api" > .env.production
 npm run build 2>&1 | tail -5
-ok "Frontend built to $APP_DIR/dist/"
+ok "Frontend built to $APP_DIR/frontend/dist/"
 
 # ================================================================
 # STEP 9: Configure Nginx
 # ================================================================
 info "Step 9/12: Configuring Nginx..."
 
-NGINX_SITE="/etc/nginx/sites-available/sehat-connect"
+NGINX_SITE="/etc/nginx/sites-available/ecohealth"
 
 # Phase 1: HTTP-only config (for certbot)
 cat > "$NGINX_SITE" <<HTTPONLY
@@ -352,7 +352,7 @@ server {
 }
 HTTPONLY
 
-ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/sehat-connect
+ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/ecohealth
 rm -f /etc/nginx/sites-enabled/default
 
 nginx -t 2>&1
@@ -435,7 +435,7 @@ server {
     gzip_types text/plain text/css text/xml application/json application/javascript application/xml+rss image/svg+xml;
 
     # Frontend static files
-    root $APP_DIR/dist;
+    root $APP_DIR/frontend/dist;
     index index.html;
 
     # SPA fallback
@@ -495,8 +495,8 @@ server {
 
     client_max_body_size 30m;
 
-    access_log /var/log/nginx/sehat-connect-access.log;
-    error_log /var/log/nginx/sehat-connect-error.log;
+    access_log /var/log/nginx/ecohealth-access.log;
+    error_log /var/log/nginx/ecohealth-error.log;
 }
 NGINXEOF
 
@@ -525,7 +525,7 @@ done
 if [ "$HEALTH_OK" = true ]; then
   ok "Health check passed!"
 else
-  warn "Health check failed. Check: sudo pm2 logs sehat-connect-backend --lines 30"
+  warn "Health check failed. Check: sudo pm2 logs ecohealth-backend --lines 30"
 fi
 
 # ================================================================

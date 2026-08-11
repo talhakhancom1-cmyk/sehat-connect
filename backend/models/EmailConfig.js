@@ -37,7 +37,7 @@ const EmailConfig = sequelize.define('EmailConfig', {
   },
   from_name: {
     type: DataTypes.STRING,
-    defaultValue: 'Sehat Connect'
+    defaultValue: 'EcoHealth'
   },
   // Reply-to address (optional)
   reply_to: {
