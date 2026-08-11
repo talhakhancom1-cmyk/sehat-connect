@@ -186,6 +186,40 @@ const migrateMissingColumns = async () => {
 // (WHERE clause) allow multiple cancelled/rejected appointments for the same
 // slot while preventing double-booking active ones.
 const migrateUniqueConstraints = async () => {
+  // Step 1: Clean up duplicate active conversations before creating the unique
+  // index. If duplicate conversations exist for the same appointment_id, close
+  // all but the most recently updated one.
+  try {
+    const [duplicates] = await sequelize.query(`
+      SELECT appointment_id, count(*) as dup_count
+      FROM conversations
+      WHERE appointment_id IS NOT NULL AND status = 'active'
+      GROUP BY appointment_id
+      HAVING count(*) > 1
+    `);
+    if (duplicates && duplicates.length > 0) {
+      console.log(`[migration] Found ${duplicates.length} appointment(s) with duplicate active conversations — cleaning up...`);
+      // For each duplicate set, keep the most recently updated conversation
+      // and close the rest.
+      for (const dup of duplicates) {
+        await sequelize.query(`
+          UPDATE conversations SET status = 'closed'
+          WHERE appointment_id = '${dup.appointment_id}'
+            AND status = 'active'
+            AND id NOT IN (
+              SELECT id FROM conversations
+              WHERE appointment_id = '${dup.appointment_id}' AND status = 'active'
+              ORDER BY updated_at DESC
+              LIMIT 1
+            )
+        `);
+      }
+      console.log(`[migration] Duplicate conversations cleaned up — closed ${duplicates.length} duplicate(s)`);
+    }
+  } catch (error) {
+    console.log('ℹ️ Duplicate conversation cleanup skipped:', error.message);
+  }
+
   const statements = [
     // Prevent double-booking: only one active appointment per doctor+date+slot.
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_appointment_active_slot
@@ -208,7 +242,10 @@ const migrateUniqueConstraints = async () => {
     try {
       await sequelize.query(sql);
     } catch (error) {
-      console.log('ℹ️ Unique constraint migration skipped:', error.message);
+      // Log the FULL error (including parent/original) so we can diagnose
+      // constraint creation failures, not just the truncated message.
+      const fullError = error.parent?.message || error.original?.message || error.message;
+      console.log(`ℹ️ Unique constraint migration skipped for: ${sql.substring(0, 60)}... — ${fullError}`);
     }
   }
 };
