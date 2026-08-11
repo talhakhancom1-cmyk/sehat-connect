@@ -120,8 +120,16 @@ async function chatCompletion(messages) {
     if (!resp.ok) {
       const errBody = await resp.text();
       console.error('[openai] Chat API error:', resp.status, errBody);
+      let userMessage = 'I apologize, but I encountered an error. Please try again or consult a doctor directly.';
+      if (resp.status === 401) {
+        userMessage = 'The symptom checker is not properly configured. Please contact support.';
+      } else if (resp.status === 429) {
+        userMessage = 'The symptom checker is temporarily unavailable due to high demand or API limits. Please try again later or consult a doctor directly.';
+      } else if (resp.status === 500 || resp.status === 503) {
+        userMessage = 'The AI service is temporarily unavailable. Please try again in a few minutes or consult a doctor directly.';
+      }
       return {
-        response: 'I apologize, but I encountered an error. Please try again or consult a doctor directly. This is not a medical diagnosis. Please consult a doctor for proper evaluation.',
+        response: `${userMessage} This is not a medical diagnosis. Please consult a doctor for proper evaluation.`,
         urgency: null,
         specialty: null,
         is_final: true,
