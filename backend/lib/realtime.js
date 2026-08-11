@@ -17,6 +17,7 @@
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const { CallRoom, CallParticipant, User } = require('../models');
+const { getUserCallStatus, getCallerIdentity } = require('./internalClient');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -184,8 +185,10 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         console.log(`[realtime] call:initiate from ${userId} to ${to_user_id} type=${call_type}`);
         if (!to_user_id) return ack && ack({ error: 'to_user_id is required' });
 
-        // Check if the target has Do Not Disturb enabled (read fresh from DB on every call)
-        const targetUser = await User.findByPk(to_user_id, { attributes: ['id', 'do_not_disturb', 'display_name', 'email'] });
+        // Check if the target has Do Not Disturb enabled.
+        // Uses the internal API client which calls ehcserver's /internal endpoint
+        // (the WebSocket server's local DB may not contain the target user).
+        const targetUser = await getUserCallStatus(to_user_id);
         console.log(`[realtime] checking DND for target user ${to_user_id}: do_not_disturb=${targetUser?.do_not_disturb}`);
         if (targetUser?.do_not_disturb) {
           console.log(`[realtime] call BLOCKED — target ${to_user_id} (${targetUser.display_name || targetUser.email}) has DND enabled`);
@@ -206,9 +209,8 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         callMembers.get(room.id).add(userId);
 
         // Fetch caller's display info to send with the ringing event.
-        const caller = await User.findByPk(userId, {
-          attributes: ['id', 'display_name', 'email', 'profile_pic_url', 'role', 'specialty'],
-        });
+        // Uses the internal API client for cross-server user lookup.
+        const caller = await getCallerIdentity(userId);
         const callerName = caller?.display_name || caller?.email || 'Unknown';
         const callerImageUrl = caller?.profile_pic_url || null;
 
@@ -440,9 +442,7 @@ function buildBroadcasters(io) {
      * Ring a specific user (incoming call notification).
      */
     async emitCallRinging(callId, fromUserId, toUserId) {
-      const caller = await User.findByPk(fromUserId, {
-        attributes: ['id', 'display_name', 'profile_pic_url'],
-      });
+      const caller = await getCallerIdentity(fromUserId);
       const callerName = caller?.display_name || 'Unknown';
       const targetSockets = getSocketIdsForUser(toUserId);
       targetSockets.forEach((sid) => {

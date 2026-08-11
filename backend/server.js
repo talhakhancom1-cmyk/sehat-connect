@@ -314,9 +314,14 @@ const encountersListRoutes = require('./routes/encountersList');
 const socketEvents = require('./lib/socketEvents');
 const apiKeyRoutes = require('./routes/apiKeys');
 const emailConfigRoutes = require('./routes/emailConfig');
+const internalRoutes = require('./routes/internal');
 
 // Use routes
 app.use(generalLimiter); // Apply general rate limiting to all API routes
+
+// Internal service-to-service API (protected by INTERNAL_API_SECRET, not JWT)
+// Mounted before /api routes so it's not affected by API rate limiting.
+app.use('/internal', internalRoutes);
 
 // Public endpoint — returns only whether signup OTP is enabled (no auth needed)
 // Used by the Register page to decide whether to show the OTP step.
