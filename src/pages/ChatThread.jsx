@@ -43,13 +43,25 @@ export default function ChatThread() {
     let alive = true;
     const load = async () => {
       try {
-        const convo = await base44.entities.Conversation.get(conversationId).catch(() => null);
+        const convo = await base44.entities.Conversation.get(conversationId).catch((e) => {
+          console.error('[ChatThread] Failed to load conversation:', e);
+          return null;
+        });
         if (!alive) return;
         setConversation(convo);
         // Fetch the appointment linked to this conversation (for waiting room)
+        console.log('[ChatThread] conversation loaded:', { id: convo?.id, appointment_id: convo?.appointment_id, doctor_id: convo?.doctor_id, patient_id: convo?.patient_id });
         if (convo?.appointment_id) {
-          const appt = await base44.entities.Appointment.get(convo.appointment_id).catch(() => null);
-          if (alive && appt) setAppointment(appt);
+          const appt = await base44.entities.Appointment.get(convo.appointment_id).catch((e) => {
+            console.error('[ChatThread] Failed to load appointment:', convo.appointment_id, e);
+            return null;
+          });
+          if (alive && appt) {
+            console.log('[ChatThread] appointment loaded:', { id: appt.id, date: appt.appointment_date, time_slot: appt.time_slot, status: appt.status });
+            setAppointment(appt);
+          }
+        } else {
+          console.warn('[ChatThread] No appointment_id on conversation — waiting room will not be enforced');
         }
         const msgs = await listMessages(conversationId);
         if (!alive) return;
@@ -178,6 +190,7 @@ export default function ChatThread() {
 
     // If the user is a patient and there's an appointment, check the waiting room logic
     const isDoctor = user?.role === 'doctor' || user?.app_role === 'doctor' || role === 'doctor';
+    console.log('[ChatThread] waiting room check:', { isDoctor, hasAppointment: !!appointment, appointmentId: appointment?.id });
     if (!isDoctor && appointment) {
       // Check if the appointment time has arrived
       const apptDate = new Date(appointment.appointment_date);
@@ -196,24 +209,31 @@ export default function ChatThread() {
       const EARLY_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
       const earlyEntryTime = new Date(apptDate.getTime() - EARLY_BUFFER_MS);
       const isActive = ['confirmed', 'in_progress', 'pending'].includes(appointment.status);
+      console.log('[ChatThread] time check:', { apptDate: apptDate.toISOString(), now: now.toISOString(), earlyEntry: earlyEntryTime.toISOString(), status: appointment.status, isActive, timeSlot });
 
       if (isActive && now.getTime() < apptDate.getTime()) {
         // Show waiting room (patient is within 10 min or too early)
         if (now.getTime() >= earlyEntryTime.getTime()) {
           // Within 10 min — show waiting room with countdown
+          console.log('[ChatThread] showing waiting room (within 10 min window)');
           setWaitingRoom({ callType: video ? 'video' : 'audio' });
           return;
         } else {
           // Too early — show waiting room (it will show "too early" message)
+          console.log('[ChatThread] showing waiting room (too early)');
           setWaitingRoom({ callType: video ? 'video' : 'audio' });
           return;
         }
       } else if (!isActive) {
         // Appointment not active — show waiting room (it will show "ended" message)
+        console.log('[ChatThread] showing waiting room (appointment not active, status=' + appointment.status + ')');
         setWaitingRoom({ callType: video ? 'video' : 'audio' });
         return;
       }
       // Appointment time has arrived and is active — proceed with call
+      console.log('[ChatThread] appointment time arrived, proceeding with call');
+    } else if (!isDoctor && !appointment) {
+      console.warn('[ChatThread] patient has no appointment — call will proceed without waiting room gate');
     }
 
     await callCtx.startCall(conversation, other, user, { video });

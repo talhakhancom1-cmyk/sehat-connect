@@ -184,12 +184,14 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
         console.log(`[realtime] call:initiate from ${userId} to ${to_user_id} type=${call_type}`);
         if (!to_user_id) return ack && ack({ error: 'to_user_id is required' });
 
-        // Check if the target has Do Not Disturb enabled
-        const targetUser = await User.findByPk(to_user_id, { attributes: ['id', 'do_not_disturb', 'display_name'] });
+        // Check if the target has Do Not Disturb enabled (read fresh from DB on every call)
+        const targetUser = await User.findByPk(to_user_id, { attributes: ['id', 'do_not_disturb', 'display_name', 'email'] });
+        console.log(`[realtime] checking DND for target user ${to_user_id}: do_not_disturb=${targetUser?.do_not_disturb}`);
         if (targetUser?.do_not_disturb) {
-          console.log(`[realtime] call blocked — target ${to_user_id} has DND enabled`);
+          console.log(`[realtime] call BLOCKED — target ${to_user_id} (${targetUser.display_name || targetUser.email}) has DND enabled`);
           return ack && ack({ error: 'The doctor is currently unavailable (Do Not Disturb mode). Please try again later or send a message.' });
         }
+        console.log(`[realtime] DND check passed — target ${to_user_id} is available`);
 
         const room = await CallRoom.create({
           conversation_id,
@@ -205,9 +207,9 @@ function attachSocketServer(httpServer, corsOrigin = '*') {
 
         // Fetch caller's display info to send with the ringing event.
         const caller = await User.findByPk(userId, {
-          attributes: ['id', 'display_name', 'profile_pic_url'],
+          attributes: ['id', 'display_name', 'email', 'profile_pic_url', 'role', 'specialty'],
         });
-        const callerName = caller?.display_name || 'Unknown';
+        const callerName = caller?.display_name || caller?.email || 'Unknown';
         const callerImageUrl = caller?.profile_pic_url || null;
 
         // Ring the target user (only if they have sockets online).
