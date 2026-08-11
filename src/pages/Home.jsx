@@ -10,6 +10,8 @@ import { Calendar, Clock, HeartPulse, MessageCircle, Stethoscope, Baby, Brain, E
 import { cn, formatAppointmentDate } from '@/lib/utils';
 import { getOrCreateForAppointment } from '@/lib/conversations';
 import { useCallInitiator } from '@/lib/useCallInitiator';
+import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
+import WaitingRoom from '@/components/WaitingRoom';
 
 const specialties = [
   { name: 'Cardiology', icon: HeartPulse, color: 'bg-rose-50 text-rose-500' },
@@ -26,6 +28,7 @@ export default function Home() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
+  const gate = useAppointmentCallGate();
   const [openingChat, setOpeningChat] = useState(false);
 
   useEffect(() => { if (user?.id) loadData(); }, [user?.id]);
@@ -59,6 +62,7 @@ export default function Home() {
   const nextAppt = upcomingAppts[0];
   const name = user?.display_name?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'there';
   const canJoinCall = nextAppt?.status === 'confirmed' && nextAppt?.type === 'video';
+  const callGate = nextAppt ? gate.getCallGateState(nextAppt) : null;
 
   return (
     <Layout>
@@ -102,13 +106,28 @@ export default function Home() {
                 Cancel
               </button>
               {canJoinCall ? (
-                <button
-                  onClick={() => startCallFromAppointment(nextAppt, user, { video: true })}
-                  className="flex-1 py-2.5 rounded-2xl bg-[#D97757] text-white text-sm font-semibold hover:bg-[#C9683F] active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <Video className="w-4 h-4" />
-                  Join Call
-                </button>
+                <>
+                  {callGate?.status === 'too_early' ? (
+                    <button
+                      disabled
+                      className="flex-1 py-2.5 rounded-2xl bg-gray-300 text-gray-500 text-sm font-semibold cursor-not-allowed flex flex-col items-center justify-center gap-0.5"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Video className="w-4 h-4" />
+                        Join Call
+                      </span>
+                      <span className="text-[10px] font-normal">Available 10 min before</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => gate.startGatedCall(nextAppt, { video: true })}
+                      className="flex-1 py-2.5 rounded-2xl bg-[#D97757] text-white text-sm font-semibold hover:bg-[#C9683F] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Video className="w-4 h-4" />
+                      Join Call
+                    </button>
+                  )}
+                </>
               ) : (
                 <Link
                   to="/appointments"
@@ -264,6 +283,15 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {gate.waitingRoom && (
+        <WaitingRoom
+          appointment={gate.waitingRoom.appointment}
+          callType={gate.waitingRoom.callType}
+          onJoin={gate.joinFromWaitingRoom}
+          onClose={gate.closeWaitingRoom}
+        />
+      )}
     </Layout>
   );
 }

@@ -3,6 +3,8 @@ import { Video, MessageSquare, Home, Building2, Phone, Clock, Calendar, MessageC
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateForAppointment } from '@/lib/conversations';
+import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
+import WaitingRoom from '@/components/WaitingRoom';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import StatusBadge from '@/components/StatusBadge';
 import { cn, formatAppointmentDate } from '@/lib/utils';
@@ -28,12 +30,14 @@ const typeBorder = {
 export default function AppointmentCard({ appointment, onJoin, onCancel, onVideoCall, onPay, role = 'patient' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const gate = useAppointmentCallGate();
   const [openingChat, setOpeningChat] = useState(false);
   const type = typeConfig[appointment.type] || typeConfig.video;
   const name = role === 'doctor' ? appointment.patient_name : appointment.doctor_name;
   const subtitle = role === 'doctor' ? appointment.patient_age ? `${appointment.patient_age}y · ${type.label}` : type.label : type.label;
   const fee = appointment.consultation_fee;
   const canJoinCall = appointment.status === 'confirmed' && appointment.type === 'video';
+  const callGate = role === 'patient' ? gate.getCallGateState(appointment) : null;
 
   const openChat = async () => {
     if (openingChat) return;
@@ -98,9 +102,27 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
       )}
 
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60">
-        {canJoinCall && (
+        {canJoinCall && role === 'patient' && callGate?.status === 'too_early' && (
           <button
-            onClick={() => onVideoCall?.(appointment)}
+            disabled
+            className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl bg-gray-200 text-gray-500 text-xs font-semibold cursor-not-allowed"
+          >
+            <span className="flex items-center gap-1.5">
+              <Video className="w-3.5 h-3.5" />
+              Join Call
+            </span>
+            <span className="text-[9px] font-normal">10 min before</span>
+          </button>
+        )}
+        {canJoinCall && !(role === 'patient' && callGate?.status === 'too_early') && (
+          <button
+            onClick={() => {
+              if (role === 'patient') {
+                gate.startGatedCall(appointment, { video: true });
+              } else {
+                onVideoCall?.(appointment);
+              }
+            }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 active:scale-95 transition-all"
           >
             <Video className="w-3.5 h-3.5" />
@@ -163,6 +185,15 @@ export default function AppointmentCard({ appointment, onJoin, onCancel, onVideo
           </button>
         )}
       </div>
+
+      {gate.waitingRoom && (
+        <WaitingRoom
+          appointment={gate.waitingRoom.appointment}
+          callType={gate.waitingRoom.callType}
+          onJoin={gate.joinFromWaitingRoom}
+          onClose={gate.closeWaitingRoom}
+        />
+      )}
     </div>
   );
 }

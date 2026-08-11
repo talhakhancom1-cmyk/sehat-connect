@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useRole } from '@/lib/useRole';
 import { useCall } from '@/lib/CallContext';
+import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
 import Layout from '@/components/Layout';
 import DoctorAvatar from '@/components/DoctorAvatar';
 import VoiceRecorder from '@/components/chat/VoiceRecorder';
@@ -26,13 +27,13 @@ export default function ChatThread() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const callCtx = useCall();
+  const gate = useAppointmentCallGate();
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [waitingRoom, setWaitingRoom] = useState(null); // { callType: 'video'|'audio' }
   const [appointment, setAppointment] = useState(null);
   const messagesEndRef = useRef(null);
 
@@ -189,80 +190,15 @@ export default function ChatThread() {
       return;
     }
 
-    // If the user is a patient and there's an appointment, check the waiting room logic
-    const isDoctor = user?.role === 'doctor' || user?.app_role === 'doctor' || role === 'doctor';
-    console.log('[ChatThread] waiting room check:', { isDoctor, hasAppointment: !!appointment, appointmentId: appointment?.id });
-    if (!isDoctor && appointment) {
-      // Parse the appointment date — could be "2026-08-10" (fixed) or a Date string (legacy)
-      const rawDate = appointment.appointment_date;
-      const apptDate = new Date(rawDate);
-      if (isNaN(apptDate.getTime())) {
-        console.error('[ChatThread] INVALID appointment date:', JSON.stringify(rawDate), '— proceeding without waiting room gate');
-      } else {
-        const timeSlot = appointment.time_slot || '';
-        const m = timeSlot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (m) {
-          let h = parseInt(m[1], 10);
-          const min = parseInt(m[2], 10);
-          const ap = m[3].toUpperCase();
-          if (ap === 'PM' && h !== 12) h += 12;
-          if (ap === 'AM' && h === 12) h = 0;
-          apptDate.setHours(h, min, 0, 0);
-        } else {
-          console.warn('[ChatThread] time_slot does not match expected format:', JSON.stringify(timeSlot));
-        }
-
-        const now = new Date();
-        const EARLY_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
-        const earlyEntryTime = new Date(apptDate.getTime() - EARLY_BUFFER_MS);
-        const isActive = ['confirmed', 'in_progress', 'pending'].includes(appointment.status);
-        console.log('[ChatThread] time check:', {
-          rawDate,
-          apptDate: apptDate.toISOString(),
-          now: now.toISOString(),
-          earlyEntry: earlyEntryTime.toISOString(),
-          status: appointment.status,
-          isActive,
-          timeSlot,
-          isBefore: now.getTime() < apptDate.getTime()
-        });
-
-        if (isActive && now.getTime() < apptDate.getTime()) {
-          // Show waiting room (patient is within 10 min or too early)
-          if (now.getTime() >= earlyEntryTime.getTime()) {
-            // Within 10 min — show waiting room with countdown
-            console.log('[ChatThread] showing waiting room (within 10 min window)');
-            setWaitingRoom({ callType: video ? 'video' : 'audio' });
-            return;
-          } else {
-            // Too early — show waiting room (it will show "too early" message)
-            console.log('[ChatThread] showing waiting room (too early)');
-            setWaitingRoom({ callType: video ? 'video' : 'audio' });
-            return;
-          }
-        } else if (!isActive) {
-          // Appointment not active — show waiting room (it will show "ended" message)
-          console.log('[ChatThread] showing waiting room (appointment not active, status=' + appointment.status + ')');
-          setWaitingRoom({ callType: video ? 'video' : 'audio' });
-          return;
-        }
-        // Appointment time has arrived and is active — proceed with call
-        console.log('[ChatThread] appointment time arrived, proceeding with call');
-      }
-    } else if (!isDoctor && !appointment) {
-      console.warn('[ChatThread] patient has no appointment — call will proceed without waiting room gate');
-    }
-
-    await callCtx.startCall(conversation, other, user, { video });
-  };
-
-  const handleJoinFromWaitingRoom = async () => {
-    const video = waitingRoom?.callType === 'video';
-    setWaitingRoom(null);
-    if (!callCtx) {
-      alert('Call system not available. Please refresh the page.');
+    // Use the shared appointment call gate for patients
+    if (appointment) {
+      console.log('[ChatThread] using shared gate for appointment:', appointment.id);
+      await gate.startGatedCall(appointment, { video });
       return;
     }
+
+    // No appointment — proceed directly (e.g. doctor-to-doctor or no appointment linked)
+    console.log('[ChatThread] no appointment — proceeding without gate');
     await callCtx.startCall(conversation, other, user, { video });
   };
 
@@ -405,12 +341,12 @@ export default function ChatThread() {
       </div>
 
       {/* Virtual Waiting Room — shown when patient tries to call before appointment time */}
-      {waitingRoom && appointment && (
+      {gate.waitingRoom && (
         <WaitingRoom
-          appointment={appointment}
-          callType={waitingRoom.callType}
-          onJoin={handleJoinFromWaitingRoom}
-          onClose={() => setWaitingRoom(null)}
+          appointment={gate.waitingRoom.appointment}
+          callType={gate.waitingRoom.callType}
+          onJoin={gate.joinFromWaitingRoom}
+          onClose={gate.closeWaitingRoom}
         />
       )}
     </Layout>

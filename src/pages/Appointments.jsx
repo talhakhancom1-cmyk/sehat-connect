@@ -9,6 +9,8 @@ import { SlidersHorizontal, Calendar } from 'lucide-react';
 import PaymentDialog from '@/components/PaymentDialog';
 import { useToast } from '@/components/ui/use-toast';
 import { useCallInitiator } from '@/lib/useCallInitiator';
+import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
+import WaitingRoom from '@/components/WaitingRoom';
 
 const tabs = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
 
@@ -19,6 +21,7 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
   const { activeCall, startCallFromAppointment, endCall } = useCallInitiator();
+  const gate = useAppointmentCallGate();
   const [payAppt, setPayAppt] = useState(null);
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -86,7 +89,7 @@ export default function Appointments() {
                 appointment={appt}
                 onCancel={handleCancel}
                 onPay={(a) => setPayAppt(a)}
-                onVideoCall={(a) => startCallFromAppointment(a, user, { video: true })}
+                onVideoCall={(a) => gate.startGatedCall(a, { video: true })}
               />
             ))}
           </div>
@@ -109,6 +112,15 @@ export default function Appointments() {
           open={!!payAppt}
           onClose={() => setPayAppt(null)}
           onPaid={load}
+        />
+      )}
+
+      {gate.waitingRoom && (
+        <WaitingRoom
+          appointment={gate.waitingRoom.appointment}
+          callType={gate.waitingRoom.callType}
+          onJoin={gate.joinFromWaitingRoom}
+          onClose={gate.closeWaitingRoom}
         />
       )}
     </Layout>
