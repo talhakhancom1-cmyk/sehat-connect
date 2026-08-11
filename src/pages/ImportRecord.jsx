@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { UploadCloud, FileText, Wand2, CheckCircle2, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const CATEGORIES = [
   'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
@@ -50,7 +51,7 @@ export default function ImportRecord() {
       setForm(prev => ({ ...prev, title: prev.title || f.name.replace(/\.[^/.]+$/, '') }));
       setStep(1);
     } catch (err) {
-      toast({ title: 'Upload failed', description: err.message || 'Could not upload file', variant: 'destructive' });
+      toast({ title: 'Upload failed', description: toUserError(err, 'Could not upload file'), variant: 'destructive' });
     } finally { setUploading(false); }
   };
 
@@ -120,7 +121,7 @@ export default function ImportRecord() {
       });
       setStep(3);
     } catch (err) {
-      toast({ title: 'Save failed', description: err.message || 'Could not save record', variant: 'destructive' });
+      toast({ title: 'Save failed', description: toUserError(err, 'Could not save record'), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 

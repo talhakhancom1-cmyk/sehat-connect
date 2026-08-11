@@ -2,6 +2,10 @@ const express = require('express');
 const { Encounter, Appointment } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { canAccessEncounter, canAccessAppointment } = require('../lib/ownership');
+const { validateEnum, validateStringLength, sanitizeError } = require('../lib/validate');
+
+const ENCOUNTER_TYPES = ['video', 'audio', 'chat', 'physical', 'home', 'emergency'];
+const ENCOUNTER_STATUSES = ['draft', 'completed'];
 
 const router = express.Router({ mergeParams: true });
 
@@ -58,6 +62,24 @@ router.post('/', authenticate, async (req, res) => {
       || sanitizeDate(appointment.appointment_date)
       || new Date();
 
+    // --- Server-side validation ---
+    const rb = req.body || {};
+    if (rb.status) {
+      const err = validateEnum(rb.status, ENCOUNTER_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (rb.encounter_type) {
+      const err = validateEnum(rb.encounter_type, ENCOUNTER_TYPES, 'encounter_type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    const clinicalFields = ['chief_complaint', 'examination', 'diagnosis', 'differential_diagnosis', 'clinical_notes', 'advice', 'follow_up'];
+    for (const f of clinicalFields) {
+      if (rb[f] !== undefined && rb[f] !== null) {
+        const err = validateStringLength(rb[f], 5000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+
     const encounter = await Encounter.create({
       appointment_id: req.params.appointmentId,
       patient_id: appointment.patient_id,
@@ -74,7 +96,7 @@ router.post('/', authenticate, async (req, res) => {
     });
     res.status(201).json(encounter);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

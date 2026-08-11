@@ -6,6 +6,10 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { User, Session, PasswordReset, OtpCode } = require('../models');
 const { sendPasswordResetEmail, sendSignupOtpEmail, isFeatureEnabled } = require('../lib/emailService');
+const {
+  validateEmail, validatePhone, validateNumericRange, validateStringLength,
+  validateEnum, validateDateRange, sanitizeError
+} = require('../lib/validate');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -97,6 +101,42 @@ router.put('/me', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
+    // --- Server-side validation (before applying updates) ---
+    const body = req.body || {};
+    if (body.phone !== undefined && body.phone !== null && body.phone !== '') {
+      if (!validatePhone(body.phone)) {
+        return res.status(400).json({ error: 'Phone number format is invalid' });
+      }
+    }
+    if (body.consultation_fee !== undefined && body.consultation_fee !== null && body.consultation_fee !== '') {
+      const err = validateNumericRange(body.consultation_fee, 0, 1000000, 'consultation_fee');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.experience_years !== undefined && body.experience_years !== null && body.experience_years !== '') {
+      const err = validateNumericRange(body.experience_years, 0, 70, 'experience_years');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.age !== undefined && body.age !== null && body.age !== '') {
+      const err = validateNumericRange(body.age, 0, 150, 'age');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.bio !== undefined && body.bio !== null) {
+      const err = validateStringLength(body.bio, 2000, 'bio');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.address !== undefined && body.address !== null) {
+      const err = validateStringLength(body.address, 500, 'address');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.emergency_contact_name !== undefined && body.emergency_contact_name !== null) {
+      const err = validateStringLength(body.emergency_contact_name, 100, 'emergency_contact_name');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.emergency_contact_phone !== undefined && body.emergency_contact_phone !== null && body.emergency_contact_phone !== '') {
+      if (!validatePhone(body.emergency_contact_phone)) {
+        return res.status(400).json({ error: 'Emergency contact phone format is invalid' });
+      }
+    }
     // Whitelist fields to prevent mass-assignment (e.g. role escalation)
     const allowedFields = [
       'display_name', 'phone', 'address', 'city', 'country',
@@ -112,17 +152,15 @@ router.put('/me', async (req, res) => {
     });
     // Validate date_of_birth if provided
     if (updates.date_of_birth) {
-      const dobYear = new Date(updates.date_of_birth).getFullYear();
       const currentYear = new Date().getFullYear();
-      if (Number.isNaN(dobYear) || dobYear < 1900 || dobYear > currentYear) {
-        return res.status(400).json({ error: `Invalid date of birth: year must be between 1900 and ${currentYear}` });
-      }
+      const err = validateDateRange(updates.date_of_birth, 1900, currentYear, 'date_of_birth');
+      if (err) return res.status(400).json({ error: err });
     }
     await user.update(updates);
     res.json(user);
   } catch (error) {
     console.error('Update me error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeError(error) });
   }
 });
 
@@ -133,8 +171,24 @@ router.post('/register', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
+    // --- Server-side validation ---
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: 'Email format is invalid' });
+    }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+      return res.status(400).json({ error: 'Password must contain at least one letter and one number' });
+    }
+    if (fullName !== undefined && fullName !== null && fullName !== '') {
+      if (fullName.trim().length < 2 || fullName.trim().length > 100) {
+        return res.status(400).json({ error: 'fullName must be between 2 and 100 characters' });
+      }
+    }
+    if (role !== undefined && role !== null && role !== '') {
+      const err = validateEnum(role, User.ROLE_VALUES, 'role');
+      if (err) return res.status(400).json({ error: err });
     }
     const existing = await User.findOne({ where: { email } });
     if (existing) {
@@ -155,7 +209,7 @@ router.post('/register', async (req, res) => {
     res.json({ token, user });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: sanitizeError(error) });
   }
 });
 

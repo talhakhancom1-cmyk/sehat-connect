@@ -8,6 +8,8 @@ import StatusBadge from '@/components/StatusBadge';
 import { Stethoscope, Users, Calendar, DollarSign, ShieldCheck, Ban } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 import { formatAppointmentDate } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -19,6 +21,7 @@ function formatLocalDate(d) {
 }
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
   const [doctors, setDoctors] = useState([]);
   const [users, setUsers] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -69,6 +72,7 @@ export default function AdminDashboard() {
       load();
     } catch (e) {
       console.error(e);
+      toast({ title: 'Verification failed', description: toUserError(e), variant: 'destructive' });
     } finally {
       setVerifyingId(null);
     }

@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
 const { canAccessSchedule, isAdmin } = require('../lib/ownership');
+const { validateNumericRange, validateTimeFormat, sanitizeError } = require('../lib/validate');
 
 const router = express.Router();
 
@@ -166,6 +167,23 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const body = req.body || {};
     if (!body.doctor_id) return res.status(400).json({ error: 'doctor_id is required' });
+    // --- Server-side validation ---
+    if (body.max_patients_per_day !== undefined && body.max_patients_per_day !== null && body.max_patients_per_day !== '') {
+      const err = validateNumericRange(body.max_patients_per_day, 1, 100, 'max_patients_per_day');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.slot_duration_minutes !== undefined && body.slot_duration_minutes !== null && body.slot_duration_minutes !== '') {
+      const err = validateNumericRange(body.slot_duration_minutes, 5, 120, 'slot_duration_minutes');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.break_start) {
+      const err = validateTimeFormat(body.break_start, 'break_start');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.break_end) {
+      const err = validateTimeFormat(body.break_end, 'break_end');
+      if (err) return res.status(400).json({ error: err });
+    }
     // Ensure the doctor_id belongs to the current user (or admin)
     if (!isAdmin(req.user)) {
       const doctor = await Doctor.findOne({
@@ -189,7 +207,7 @@ router.post('/', authenticate, async (req, res) => {
     });
     res.status(201).json(schedule);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -202,12 +220,30 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden — you do not have access to this schedule' });
     }
+    // --- Server-side validation (updates) ---
+    const upd = req.body || {};
+    if (upd.max_patients_per_day !== undefined && upd.max_patients_per_day !== null && upd.max_patients_per_day !== '') {
+      const err = validateNumericRange(upd.max_patients_per_day, 1, 100, 'max_patients_per_day');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.slot_duration_minutes !== undefined && upd.slot_duration_minutes !== null && upd.slot_duration_minutes !== '') {
+      const err = validateNumericRange(upd.slot_duration_minutes, 5, 120, 'slot_duration_minutes');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.break_start) {
+      const err = validateTimeFormat(upd.break_start, 'break_start');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.break_end) {
+      const err = validateTimeFormat(upd.break_end, 'break_end');
+      if (err) return res.status(400).json({ error: err });
+    }
     const updates = { ...req.body };
     delete updates.id;
     await schedule.update(updates);
     res.json(schedule);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

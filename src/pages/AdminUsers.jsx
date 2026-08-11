@@ -6,6 +6,7 @@ import { isAdmin, isDoctor, EHC_ROLES } from '@/lib/useRole';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -44,8 +45,13 @@ export default function AdminUsers() {
   };
 
   const handleRoleChange = async (userId, role) => {
-    await base44.entities.User.update(userId, { role });
-    load();
+    try {
+      await base44.entities.User.update(userId, { role });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Role update failed', description: toUserError(e), variant: 'destructive' });
+    }
   };
 
   const handleResetPassword = async () => {
@@ -65,7 +71,7 @@ export default function AdminUsers() {
       }
       setSelectedUser(null);
     } catch (err) {
-      toast({ title: 'Reset failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Reset failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setResetting(false);
     }
@@ -87,7 +93,7 @@ export default function AdminUsers() {
       window.location.href = '/';
     } catch (err) {
       localStorage.removeItem('ehc_admin_token');
-      toast({ title: 'Impersonation failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Impersonation failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setImpersonating(false);
     }

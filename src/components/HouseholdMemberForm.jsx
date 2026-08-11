@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toUserError } from '@/lib/userError';
 
 const roles = [
   { value: 'member', label: 'Member' },
@@ -25,7 +26,7 @@ export default function HouseholdMemberForm({ householdId, householdName, addedB
     try {
       await onAdd({ email: email.trim(), name: name.trim(), role, relationship, is_minor: isMinor || role === 'dependent_minor' });
     } catch (e) {
-      setErr(e?.message || 'Could not add member');
+      setErr(toUserError(e, 'Could not add member'));
     } finally { setSaving(false); }
   };
 

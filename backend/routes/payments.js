@@ -10,6 +10,9 @@ const {
   DEFAULT_FX_RATES
 } = require('../lib/paymentProvider');
 const { parseSort } = require('../lib/parseSort');
+const { validateEnum, sanitizeError } = require('../lib/validate');
+
+const PAYMENT_PROVIDERS = ['jazzcash', 'easypaisa', 'raast', 'local_card', 'stripe', 'paypal', 'cash', 'bank_transfer'];
 
 const router = express.Router();
 
@@ -19,6 +22,19 @@ router.post('/intent', authenticate, async (req, res) => {
     const body = req.body || {};
     if (!body.patient_user_id || !body.amount) {
       return res.status(400).json({ error: 'patient_user_id and amount are required' });
+    }
+    // --- Server-side validation ---
+    if (Number(body.amount) <= 0) {
+      return res.status(400).json({ error: 'amount must be greater than 0' });
+    }
+    if (body.currency !== undefined && body.currency !== null && body.currency !== '') {
+      if (!/^[A-Z]{3}$/.test(body.currency)) {
+        return res.status(400).json({ error: 'currency must be a 3-letter uppercase code (e.g. PKR)' });
+      }
+    }
+    if (body.provider !== undefined && body.provider !== null && body.provider !== '') {
+      const err = validateEnum(body.provider, PAYMENT_PROVIDERS, 'provider');
+      if (err) return res.status(400).json({ error: err });
     }
     const provider = body.provider || resolveProvider({
       payerCountry: body.payer_country,
@@ -65,7 +81,7 @@ router.post('/intent', authenticate, async (req, res) => {
 
     res.status(201).json(payment);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -178,6 +194,15 @@ router.post('/', authenticate, async (req, res) => {
     const body = req.body || {};
     const amount = Number(body.amount || 0);
     if (!amount) return res.status(400).json({ error: 'amount is required' });
+    // --- Server-side validation ---
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'amount must be greater than 0' });
+    }
+    if (body.currency !== undefined && body.currency !== null && body.currency !== '') {
+      if (!/^[A-Z]{3}$/.test(body.currency)) {
+        return res.status(400).json({ error: 'currency must be a 3-letter uppercase code (e.g. PKR)' });
+      }
+    }
 
     const rawMethod = body.method || body.provider || 'local_card';
     const isCash = rawMethod === 'cash';
@@ -193,6 +218,8 @@ router.post('/', authenticate, async (req, res) => {
       raast: 'raast'
     };
     const provider = providerMap[rawMethod] || 'local_card';
+    const providerErr = validateEnum(provider, PAYMENT_PROVIDERS, 'provider');
+    if (providerErr) return res.status(400).json({ error: providerErr });
 
     // Validate appointment_id is a UUID or null
     let appointmentId = null;
@@ -219,7 +246,7 @@ router.post('/', authenticate, async (req, res) => {
     });
     res.status(201).json(payment);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
 const { isAdmin } = require('../lib/ownership');
+const { validateStringLength, sanitizeError } = require('../lib/validate');
 
 const router = express.Router();
 
@@ -61,6 +62,15 @@ router.post('/', authenticate, async (req, res) => {
     const body = req.body || {};
     if (!body.doctor_id) return res.status(400).json({ error: 'doctor_id is required' });
     if (!body.rating) return res.status(400).json({ error: 'rating is required' });
+    // --- Server-side validation ---
+    const ratingNum = Number(body.rating);
+    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return res.status(400).json({ error: 'rating must be an integer between 1 and 5' });
+    }
+    if (body.comment !== undefined && body.comment !== null) {
+      const err = validateStringLength(body.comment, 2000, 'comment');
+      if (err) return res.status(400).json({ error: err });
+    }
     const review = await Review.create({
       doctor_id: body.doctor_id,
       patient_id: body.patient_id || req.user.id,
@@ -73,7 +83,7 @@ router.post('/', authenticate, async (req, res) => {
     });
     res.status(201).json({ ...review.toJSON(), created_date: review.created_at });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -84,10 +94,22 @@ router.put('/:id', authenticate, async (req, res) => {
     if (review.patient_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
+    // --- Server-side validation (updates) ---
+    const upd = req.body || {};
+    if (upd.rating !== undefined && upd.rating !== null && upd.rating !== '') {
+      const ratingNum = Number(upd.rating);
+      if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ error: 'rating must be an integer between 1 and 5' });
+      }
+    }
+    if (upd.comment !== undefined && upd.comment !== null) {
+      const err = validateStringLength(upd.comment, 2000, 'comment');
+      if (err) return res.status(400).json({ error: err });
+    }
     await review.update(req.body);
     res.json({ ...review.toJSON(), created_date: review.created_at });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

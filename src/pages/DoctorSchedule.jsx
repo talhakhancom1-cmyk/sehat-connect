@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Save, Loader2, RotateCcw, Plus, Trash2, CalendarClock } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import Skeleton from '@/components/Skeleton';
+import { toUserError } from '@/lib/userError';
 
 const days = [
   { key: 'mon', label: 'Monday' },
@@ -153,7 +154,7 @@ export default function DoctorSchedule() {
       }
       toast({ title: 'Schedule saved', description: 'Your availability has been updated.' });
     } catch (err) {
-      toast({ title: 'Save failed', description: err.message || 'Could not save schedule', variant: 'destructive' });
+      toast({ title: 'Save failed', description: toUserError(err, 'Could not save schedule'), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

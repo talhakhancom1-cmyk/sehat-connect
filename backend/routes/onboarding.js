@@ -2,6 +2,10 @@ const express = require('express');
 const { User, Doctor } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { recordAudit, auditFromRequest } = require('../lib/audit');
+const {
+  validatePhone, validateNumericRange, validateStringLength,
+  validateEnum, validateDateRange, sanitizeError
+} = require('../lib/validate');
 
 const router = express.Router();
 
@@ -11,6 +15,50 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const body = req.body || {};
     const role = body.role === 'doctor' ? 'doctor' : 'patient';
+
+    // --- Server-side validation ---
+    if (body.age !== undefined && body.age !== null && body.age !== '') {
+      const err = validateNumericRange(body.age, 0, 150, 'age');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.consultation_fee !== undefined && body.consultation_fee !== null && body.consultation_fee !== '') {
+      const err = validateNumericRange(body.consultation_fee, 0, 1000000, 'consultation_fee');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.experience_years !== undefined && body.experience_years !== null && body.experience_years !== '') {
+      const err = validateNumericRange(body.experience_years, 0, 70, 'experience_years');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.gender !== undefined && body.gender !== null && body.gender !== '') {
+      const err = validateEnum(body.gender, ['male', 'female', 'other'], 'gender');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.blood_type !== undefined && body.blood_type !== null && body.blood_type !== '') {
+      const err = validateEnum(body.blood_type, ['A+','A-','B+','B-','AB+','AB-','O+','O-'], 'blood_type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.phone !== undefined && body.phone !== null && body.phone !== '') {
+      if (!validatePhone(body.phone)) {
+        return res.status(400).json({ error: 'Phone number format is invalid' });
+      }
+    }
+    if (body.emergency_contact_phone !== undefined && body.emergency_contact_phone !== null && body.emergency_contact_phone !== '') {
+      if (!validatePhone(body.emergency_contact_phone)) {
+        return res.status(400).json({ error: 'Emergency contact phone format is invalid' });
+      }
+    }
+    const textLimits = { bio: 2000, address: 500, allergies: 1000, city: 100, country: 100, specialty: 200, pmdc_number: 50, display_name: 100, emergency_contact_name: 100 };
+    for (const [field, max] of Object.entries(textLimits)) {
+      if (body[field] !== undefined && body[field] !== null) {
+        const err = validateStringLength(body[field], max, field);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+    if (body.date_of_birth) {
+      const currentYear = new Date().getFullYear();
+      const err = validateDateRange(body.date_of_birth, 1900, currentYear, 'date_of_birth');
+      if (err) return res.status(400).json({ error: err });
+    }
 
     const updateData = {
       onboarded: true,
@@ -112,7 +160,7 @@ router.post('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Onboarding error:', error);
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

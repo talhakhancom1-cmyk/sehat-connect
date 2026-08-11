@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { X, ShieldCheck, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const CATEGORIES = [
   'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
@@ -90,7 +91,7 @@ export default function ConsentGrantForm({ onClose, onGranted }) {
       onGranted?.();
       onClose?.();
     } catch (err) {
-      toast({ title: 'Grant failed', description: err.message || 'Could not grant access', variant: 'destructive' });
+      toast({ title: 'Grant failed', description: toUserError(err, 'Could not grant access'), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 

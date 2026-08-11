@@ -5,6 +5,23 @@ const { UploadedFile } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { uploadFile, getFileStream, deleteFile, ensureBucket, buildPublicUrl, getPresignedDownloadUrl } = require('../config/minio');
 const { canAccessFile } = require('../lib/ownership');
+const { validateFileType, sanitizeError } = require('../lib/validate');
+
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'video/webm',
+  'video/mp4',
+];
 
 const router = express.Router();
 
@@ -35,6 +52,10 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       return res.status(400).json({ error: 'file is required' });
     }
 
+    // --- Server-side validation: reject dangerous file types ---
+    const typeErr = validateFileType(req.file.mimetype, ALLOWED_MIME_TYPES, 'file');
+    if (typeErr) return res.status(400).json({ error: typeErr });
+
     // Generate a unique key for the object
     const ext = req.file.originalname ? '.' + req.file.originalname.split('.').pop() : '';
     const key = `${crypto.randomBytes(16).toString('hex')}${ext}`;
@@ -64,7 +85,7 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       size_bytes: record.size_bytes,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

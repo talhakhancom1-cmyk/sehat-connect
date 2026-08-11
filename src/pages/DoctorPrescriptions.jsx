@@ -11,6 +11,7 @@ import { generatePrescriptionPdf } from '@/lib/prescriptionPdf';
 import { formatAppointmentDate } from '@/lib/utils';
 import { Plus, FileText, ShieldCheck, Pill, Download, FileSignature, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 export default function DoctorPrescriptions() {
   const { doctor, isVerified, loading: docLoading } = useDoctorProfile();
@@ -62,7 +63,7 @@ export default function DoctorPrescriptions() {
       load();
     } catch (err) {
       console.error('Sign prescription failed:', err);
-      alert('Could not sign prescription: ' + (err?.message || 'Unknown error'));
+      toast({ title: 'Could not sign prescription', description: toUserError(err), variant: 'destructive' });
     }
   };
 

@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { QrCode, Search, ShieldCheck, AlertTriangle, Eye, Clock } from 'lucide-react';
+import { toUserError } from '@/lib/userError';
 
 export default function VerifyCard() {
   const [tokenInput, setTokenInput] = useState('');
@@ -24,8 +25,7 @@ export default function VerifyCard() {
       const res = await base44.functions.invoke('verifyHealthCardToken', { token: tok });
       setResult(res.data);
     } catch (e) {
-      const msg = e?.response?.data?.error || e?.message || 'Verification failed';
-      setError(msg);
+      setError(toUserError(e, 'Verification failed'));
     } finally { setLoading(false); }
   };
 

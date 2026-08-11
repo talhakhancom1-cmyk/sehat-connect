@@ -10,6 +10,7 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { toUserError } from "@/lib/userError";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -77,7 +78,7 @@ export default function Register() {
       setOtpResendTimer(60); // 60 second cooldown
       toast({ title: "OTP sent", description: `A verification code was sent to ${emailToSend}` });
     } catch (err) {
-      setError(err.message || "Could not send OTP");
+      setError(toUserError(err, "Could not send OTP"));
       throw err;
     } finally {
       setOtpSending(false);
@@ -120,7 +121,7 @@ export default function Register() {
         setTimeout(() => navigate("/login"), 1500);
       }
     } catch (err) {
-      setError(err.message || "Registration failed");
+      setError(toUserError(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -147,7 +148,7 @@ export default function Register() {
         setTimeout(() => navigate("/login"), 1500);
       }
     } catch (err) {
-      setError(err.message || "OTP verification failed");
+      setError(toUserError(err, "OTP verification failed"));
     } finally {
       setLoading(false);
     }
@@ -158,7 +159,7 @@ export default function Register() {
     try {
       await sendOtp(email);
     } catch (err) {
-      setError(err.message || "Could not resend OTP");
+      setError(toUserError(err, "Could not resend OTP"));
     }
   };
 

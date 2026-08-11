@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { toUserError } from '@/lib/userError';
 
 // Converts any date-like value into a valid ISO 8601 string for the backend.
 // Returns null if the value cannot be parsed, so the caller can fall back.
@@ -89,7 +90,7 @@ export default function EncounterForm({ appointment, doctor, onClose, onSaved })
     } catch (err) {
       console.error('Encounter save failed:', err);
       // Surface a clear error in the form instead of letting the raw DB error propagate.
-      const msg = err?.message || 'Could not save the encounter. Please try again.';
+      const msg = toUserError(err, 'Could not save the encounter. Please try again.');
       setError(msg);
     } finally { setSaving(false); }
   };

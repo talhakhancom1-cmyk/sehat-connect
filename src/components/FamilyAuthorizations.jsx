@@ -3,6 +3,7 @@ import { ShieldCheck, Ban } from 'lucide-react';
 import { getOutgoingDelegations, revokeDelegation } from '@/lib/familyAccess';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 export default function FamilyAuthorizations({ scope }) {
   const { user } = useAuth();
@@ -26,7 +27,7 @@ export default function FamilyAuthorizations({ scope }) {
       toast({ title: 'Access revoked' });
       load();
     } catch (e) {
-      toast({ title: 'Could not revoke', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not revoke', description: toUserError(e), variant: 'destructive' });
     }
   };
 

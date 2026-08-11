@@ -3,8 +3,11 @@ import { base44 } from '@/api/base44Client';
 import Layout from '@/components/Layout';
 import EmptyState from '@/components/EmptyState';
 import { Globe, Plus, X, Save, MapPin, Stethoscope, Shield, Check, Pencil } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 export default function AdminCountryConfig() {
+  const { toast } = useToast();
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // a config object or 'new'
@@ -19,7 +22,8 @@ export default function AdminCountryConfig() {
     try {
       const data = await base44.entities.CountryConfig.list('-created_date', 100);
       setConfigs(data);
-    } finally { setLoading(false); }
+    } catch { setConfigs([]); }
+    finally { setLoading(false); }
   };
 
   const openEdit = (cfg) => {
@@ -86,12 +90,20 @@ export default function AdminCountryConfig() {
       }
       await load();
       closeEdit();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Save failed', description: toUserError(e), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
   const toggleActive = async (cfg) => {
-    await base44.entities.CountryConfig.update(cfg.id, { is_active: !cfg.is_active });
-    load();
+    try {
+      await base44.entities.CountryConfig.update(cfg.id, { is_active: !cfg.is_active });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Update failed', description: toUserError(e), variant: 'destructive' });
+    }
   };
 
   return (

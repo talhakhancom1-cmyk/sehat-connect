@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toUserError } from '@/lib/userError';
 
 // Doctor creates a new prescription. `patients` is a de-duplicated list of
 // { patient_id, patient_name } derived from the doctor's appointments.
@@ -14,6 +15,7 @@ export default function PrescriptionForm({ patients, doctor, onClose, onCreated 
   const [followUp, setFollowUp] = useState('');
   const [meds, setMeds] = useState([{ name: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const updateMed = (i, field, value) => setMeds(m => m.map((mm, idx) => idx === i ? { ...mm, [field]: value } : mm));
   const addMed = () => setMeds(m => [...m, { name: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
@@ -24,21 +26,28 @@ export default function PrescriptionForm({ patients, doctor, onClose, onCreated 
   const handleSubmit = async () => {
     if (!canSave) return;
     setSaving(true);
-    await onCreated({
-      patient_id: patientId,
-      patient_name: patients.find(p => p.patient_id === patientId)?.patient_name || '',
-      doctor_id: doctor.id,
-      doctor_name: doctor.full_name,
-      doctor_specialty: doctor.specialty,
-      diagnosis,
-      notes,
-      follow_up: followUp || undefined,
-      date: new Date().toISOString().slice(0, 10),
-      status: 'active',
-      is_signed: false,
-      medications: meds.filter(m => m.name),
-    });
-    setSaving(false);
+    setError('');
+    try {
+      await onCreated({
+        patient_id: patientId,
+        patient_name: patients.find(p => p.patient_id === patientId)?.patient_name || '',
+        doctor_id: doctor.id,
+        doctor_name: doctor.full_name,
+        doctor_specialty: doctor.specialty,
+        diagnosis,
+        notes,
+        follow_up: followUp || undefined,
+        date: new Date().toISOString().slice(0, 10),
+        status: 'active',
+        is_signed: false,
+        medications: meds.filter(m => m.name),
+      });
+    } catch (e) {
+      console.error(e);
+      setError(toUserError(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -95,6 +104,9 @@ export default function PrescriptionForm({ patients, doctor, onClose, onCreated 
             <Input value={followUp} onChange={e => setFollowUp(e.target.value)} placeholder="e.g. Review in 1 week" className="mt-1" />
           </div>
         </div>
+        {error && (
+          <div className="px-4 py-2 text-xs text-red-600 bg-red-50 border-t border-red-100">{error}</div>
+        )}
         <div className="sticky bottom-0 bg-card border-t border-border p-4 flex gap-2">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
           <Button onClick={handleSubmit} disabled={!canSave} className="flex-1">{saving ? 'Saving…' : 'Save prescription'}</Button>

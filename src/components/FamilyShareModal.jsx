@@ -10,6 +10,7 @@ import {
   RECORD_CATEGORIES, HEALTH_CARD_TYPES,
 } from '@/lib/familyAccess';
 import { cn } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 export default function FamilyShareModal({ scope, onClose, onGranted }) {
   const { user } = useAuth();
@@ -59,7 +60,7 @@ export default function FamilyShareModal({ scope, onClose, onGranted }) {
       onGranted?.();
       onClose();
     } catch (e) {
-      toast({ title: 'Could not grant access', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not grant access', description: toUserError(e), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

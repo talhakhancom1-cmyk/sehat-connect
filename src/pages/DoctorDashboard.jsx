@@ -9,6 +9,8 @@ import EmptyState from '@/components/EmptyState';
 import DoctorSummary from '@/components/DoctorSummary';
 import { Calendar, DollarSign, Users, Clock, TrendingUp, Stethoscope, ArrowRight, ShieldAlert, BellOff, Bell } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -21,6 +23,7 @@ function formatLocalDate(d) {
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [dnd, setDnd] = useState(user?.do_not_disturb || false);
   const [togglingDnd, setTogglingDnd] = useState(false);
 
@@ -94,8 +97,13 @@ export default function DoctorDashboard() {
 
   const handleAccept = async (appt, action) => {
     if (!isVerified) return;
-    await base44.entities.Appointment.update(appt.id, { status: action });
-    load();
+    try {
+      await base44.entities.Appointment.update(appt.id, { status: action });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Action failed', description: toUserError(e), variant: 'destructive' });
+    }
   };
 
   return (

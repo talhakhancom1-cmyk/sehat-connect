@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ShieldCheck, Upload, FileCheck2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { toUserError } from '@/lib/userError';
 
 export default function DoctorVerification() {
   const navigate = useNavigate();
@@ -27,8 +28,14 @@ export default function DoctorVerification() {
   const status = doctor?.verification_status || 'pending';
 
   const uploadFile = async (file) => {
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    return file_url;
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      return file_url;
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'File upload failed', description: toUserError(e), variant: 'destructive' });
+      throw e;
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -74,7 +81,7 @@ export default function DoctorVerification() {
       });
       navigate('/doctor');
     } catch (err) {
-      toast({ title: 'Submission failed', description: err?.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Submission failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setSubmitting(false);
       setUploading(null);

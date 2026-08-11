@@ -8,6 +8,10 @@ const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
 const { canAccessMedicalRecord, isAdmin, isDoctor } = require('../lib/ownership');
+const { validateEnum, validateDateRange, validateStringLength, sanitizeError } = require('../lib/validate');
+const { RECORD_CATEGORIES } = require('../constants/ehc');
+
+const RECORD_CATEGORY_KEYS = RECORD_CATEGORIES.map(c => c.key);
 
 // Fields that can be set on a MedicalRecord
 const RECORD_WRITABLE_FIELDS = [
@@ -89,6 +93,28 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const body = pickFields(req.body, RECORD_WRITABLE_FIELDS);
+    // --- Server-side validation ---
+    if (body.category) {
+      const err = validateEnum(body.category, RECORD_CATEGORY_KEYS, 'category');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.date) {
+      const currentYear = new Date().getFullYear();
+      const err = validateDateRange(body.date, 1900, currentYear, 'date');
+      if (err) return res.status(400).json({ error: err });
+    }
+    for (const f of ['notes', 'reason_for_change']) {
+      if (body[f] !== undefined && body[f] !== null) {
+        const err = validateStringLength(body[f], 5000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+    for (const f of ['title', 'doctor_name', 'hospital', 'source_hospital']) {
+      if (body[f] !== undefined && body[f] !== null) {
+        const err = validateStringLength(body[f], 300, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
     if (!isAdmin(req.user)) {
       // Doctors may create records for their patients; everyone else is
       // scoped to their own patient_id.
@@ -110,7 +136,7 @@ router.post('/', authenticate, async (req, res) => {
     const record = await MedicalRecord.create(body);
     res.status(201).json(record);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

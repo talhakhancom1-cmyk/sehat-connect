@@ -6,6 +6,9 @@ const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
 const { canAccessPrescription, isAdmin } = require('../lib/ownership');
+const { validateStringLength, validateEnum, sanitizeError } = require('../lib/validate');
+
+const PRESCRIPTION_STATUSES = ['active', 'completed', 'discontinued'];
 
 const router = express.Router();
 
@@ -87,6 +90,36 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'items/medications array is required' });
     }
 
+    // --- Server-side validation ---
+    if (body.status) {
+      const err = validateEnum(body.status, PRESCRIPTION_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+    for (const f of ['diagnosis', 'notes', 'follow_up']) {
+      if (body[f] !== undefined && body[f] !== null) {
+        const err = validateStringLength(body[f], 2000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+    for (const item of meds) {
+      if (item.medication_name || item.name) {
+        const err = validateStringLength(item.medication_name || item.name, 200, 'medication name');
+        if (err) return res.status(400).json({ error: err });
+      }
+      if (item.dosage) {
+        const err = validateStringLength(item.dosage, 100, 'dosage');
+        if (err) return res.status(400).json({ error: err });
+      }
+      if (item.frequency) {
+        const err = validateStringLength(item.frequency, 100, 'frequency');
+        if (err) return res.status(400).json({ error: err });
+      }
+      if (item.duration) {
+        const err = validateStringLength(item.duration, 100, 'duration');
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+
     // Ensure the caller has a legitimate relationship with the patient.
     // Doctors must have a patient relationship; patients can only create
     // prescriptions for themselves; admins are exempt.
@@ -130,7 +163,7 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -188,6 +221,18 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const body = pickFields(req.body, PRESCRIPTION_WRITABLE);
 
+    // --- Server-side validation (updates) ---
+    if (body.status) {
+      const err = validateEnum(body.status, PRESCRIPTION_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+    for (const f of ['diagnosis', 'notes', 'follow_up']) {
+      if (body[f] !== undefined && body[f] !== null) {
+        const err = validateStringLength(body[f], 2000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
+
     // If signing the prescription, set signed_at and ensure status is 'active'
     if (body.is_signed === true) {
       body.signed_at = body.signed_at || new Date().toISOString();
@@ -203,7 +248,7 @@ router.put('/:id', authenticate, async (req, res) => {
     });
     res.json({ ...prescription.toJSON(), items, medications: items.map(itemToMedication) });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

@@ -12,6 +12,7 @@ import { getOrCreateForAppointment } from '@/lib/conversations';
 import { useCallInitiator } from '@/lib/useCallInitiator';
 import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
 import WaitingRoom from '@/components/WaitingRoom';
+import { toUserError } from '@/lib/userError';
 
 const specialties = [
   { name: 'Cardiology', icon: HeartPulse, color: 'bg-rose-50 text-rose-500' },
@@ -75,7 +76,7 @@ export default function Home() {
       loadData();
     } catch (e) {
       console.error(e);
-      toast({ title: 'Could not cancel appointment', variant: 'destructive' });
+      toast({ title: 'Could not cancel appointment', description: toUserError(e), variant: 'destructive' });
     } finally {
       setCancellingId(null);
     }

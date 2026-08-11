@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Home, Users, UserPlus, ShieldCheck, Ban, Crown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const scopeLabel = { booking: 'Book appointments', payment: 'Make payments', record_view: 'View records' };
 
@@ -54,7 +55,7 @@ export default function Household() {
       toast({ title: 'Household created' });
       setName('');
       load();
-    } catch (e) { toast({ title: 'Could not create household', description: e.message, variant: 'destructive' }); }
+    } catch (e) { toast({ title: 'Could not create household', description: toUserError(e), variant: 'destructive' }); }
     finally { setCreating(false); }
   };
 
@@ -84,7 +85,7 @@ export default function Household() {
       setShowMemberForm(false);
       load();
     } catch (e) {
-      toast({ title: 'Could not add member', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not add member', description: toUserError(e), variant: 'destructive' });
     } finally {
       setAddingMember(false);
     }
@@ -102,7 +103,7 @@ export default function Household() {
       toast({ title: 'Member removed' });
       load();
     } catch (e) {
-      toast({ title: 'Could not remove member', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not remove member', description: toUserError(e), variant: 'destructive' });
     } finally {
       setRemovingId(null);
     }
@@ -125,7 +126,7 @@ export default function Household() {
       setShowDelegationForm(false);
       load();
     } catch (e) {
-      toast({ title: 'Could not grant access', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not grant access', description: toUserError(e), variant: 'destructive' });
     } finally {
       setGranting(false);
     }
@@ -140,7 +141,7 @@ export default function Household() {
       toast({ title: 'Delegation revoked' });
       load();
     } catch (e) {
-      toast({ title: 'Could not revoke delegation', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not revoke delegation', description: toUserError(e), variant: 'destructive' });
     } finally {
       setRevokingId(null);
     }

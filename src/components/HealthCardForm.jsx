@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toUserError } from '@/lib/userError';
 
 const cardTypes = [
   { value: 'emergency', label: 'Emergency' },
@@ -35,34 +36,42 @@ export default function HealthCardForm({ patientId, patientName, onSave, onClose
   });
   const [rows, setRows] = useState([{ key: '', value: '' }]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async () => {
     if (!form.title.trim()) return;
     setSaving(true);
+    setError('');
     const dataSnapshot = {};
     rows.forEach((r) => {
       if (r.key.trim()) dataSnapshot[r.key.trim()] = r.value;
     });
-    await onSave({
-      patient_id: patientId,
-      patient_name: patientName,
-      card_type: form.card_type,
-      title: form.title.trim(),
-      categories: [form.card_type],
-      data_snapshot: dataSnapshot,
-      requires_auth: form.requires_auth,
-      lock_screen_accessible: form.lock_screen_accessible,
-      qr_enabled: form.qr_enabled,
-      allow_download: form.allow_download,
-      allow_print: form.allow_print,
-      is_online: true,
-      is_offline: false,
-      status: 'active',
-      expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : undefined,
-    });
-    setSaving(false);
+    try {
+      await onSave({
+        patient_id: patientId,
+        patient_name: patientName,
+        card_type: form.card_type,
+        title: form.title.trim(),
+        categories: [form.card_type],
+        data_snapshot: dataSnapshot,
+        requires_auth: form.requires_auth,
+        lock_screen_accessible: form.lock_screen_accessible,
+        qr_enabled: form.qr_enabled,
+        allow_download: form.allow_download,
+        allow_print: form.allow_print,
+        is_online: true,
+        is_offline: false,
+        status: 'active',
+        expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : undefined,
+      });
+    } catch (e) {
+      console.error(e);
+      setError(toUserError(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -120,6 +129,9 @@ export default function HealthCardForm({ patientId, patientName, onSave, onClose
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.allow_print} onChange={(e) => set('allow_print', e.target.checked)} /> Print</label>
           </div>
         </div>
+        {error && (
+          <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-t border-red-100">{error}</div>
+        )}
 
         <div className="sticky bottom-0 bg-card flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>

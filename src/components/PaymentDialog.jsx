@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/notifications';
 import { useToast } from '@/components/ui/use-toast';
 import { X, CreditCard, Wallet, Building2, Banknote, ShieldCheck, Loader2 } from 'lucide-react';
 import { cn, formatAppointmentDate } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const methods = [
   { id: 'jazzcash', label: 'JazzCash', icon: Wallet, hint: 'Mobile wallet' },
@@ -81,7 +82,7 @@ export default function PaymentDialog({ appointment, open, onClose, onPaid }) {
       onPaid?.();
       onClose?.();
     } catch (e) {
-      toast({ title: 'Payment failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Payment failed', description: toUserError(e), variant: 'destructive' });
     } finally {
       setProcessing(false);
     }

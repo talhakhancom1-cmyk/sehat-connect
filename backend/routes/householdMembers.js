@@ -3,6 +3,11 @@ const { HouseholdMember, Household } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
 const { canAccessHousehold, isAdmin } = require('../lib/ownership');
+const { validateEmail, validateEnum, sanitizeError } = require('../lib/validate');
+
+const MEMBER_TYPES = ['head_of_household', 'adult_family_member', 'dependent_minor', 'adult_dependent'];
+const MEMBER_STATUSES = ['invited', 'active', 'revoked', 'left', 'expired', 'declined'];
+const MEMBER_ROLES = ['head', 'member', 'admin'];
 
 const router = express.Router();
 
@@ -77,6 +82,25 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden — you are not a member of this household' });
     }
 
+    // --- Server-side validation ---
+    if (body.user_email !== undefined && body.user_email !== null && body.user_email !== '') {
+      if (!validateEmail(body.user_email)) {
+        return res.status(400).json({ error: 'user_email format is invalid' });
+      }
+    }
+    if (body.role !== undefined && body.role !== null && body.role !== '') {
+      const err = validateEnum(body.role, MEMBER_ROLES, 'role');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.member_type !== undefined && body.member_type !== null && body.member_type !== '') {
+      const err = validateEnum(body.member_type, MEMBER_TYPES, 'member_type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.status !== undefined && body.status !== null && body.status !== '') {
+      const err = validateEnum(body.status, MEMBER_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+
     const member = await HouseholdMember.create({
       household_id: body.household_id,
       household_name: body.household_name || null,
@@ -96,7 +120,7 @@ router.post('/', authenticate, async (req, res) => {
       created_date: member.created_at
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -112,6 +136,25 @@ router.put('/:id', authenticate, async (req, res) => {
     if (!allowed) {
       return res.status(403).json({ error: 'Forbidden — you are not a member of this household' });
     }
+    // --- Server-side validation (updates) ---
+    const upd = req.body || {};
+    if (upd.user_email !== undefined && upd.user_email !== null && upd.user_email !== '') {
+      if (!validateEmail(upd.user_email)) {
+        return res.status(400).json({ error: 'user_email format is invalid' });
+      }
+    }
+    if (upd.role !== undefined && upd.role !== null && upd.role !== '') {
+      const err = validateEnum(upd.role, MEMBER_ROLES, 'role');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.member_type !== undefined && upd.member_type !== null && upd.member_type !== '') {
+      const err = validateEnum(upd.member_type, MEMBER_TYPES, 'member_type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.status !== undefined && upd.status !== null && upd.status !== '') {
+      const err = validateEnum(upd.status, MEMBER_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
     const updates = { ...req.body };
     delete updates.id;
     if (updates.member_type && body.role === 'head') updates.member_type = 'head_of_household';
@@ -122,7 +165,7 @@ router.put('/:id', authenticate, async (req, res) => {
       created_date: member.created_at
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

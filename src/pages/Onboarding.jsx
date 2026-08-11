@@ -10,6 +10,7 @@ import AuthLayout from '@/components/AuthLayout';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
+import { toUserError } from '@/lib/userError';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
@@ -84,7 +85,7 @@ export default function Onboarding() {
       setter(fullUrl);
       toast({ title: 'Document uploaded', description: file.name });
     } catch (err) {
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Upload failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setUploadingDoc('');
       e.target.value = '';
@@ -125,7 +126,7 @@ export default function Onboarding() {
       toast({ title: 'Photo uploaded' });
     } catch (err) {
       URL.revokeObjectURL(localPreview);
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Upload failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       // Reset the file input so the same file can be re-selected
       e.target.value = '';
@@ -192,7 +193,7 @@ export default function Onboarding() {
       });
       window.location.href = role === 'doctor' ? '/doctor' : '/';
     } catch (err) {
-      toast({ title: 'Error', description: err.message || 'Failed to save profile', variant: 'destructive' });
+      toast({ title: 'Error', description: toUserError(err, 'Failed to save profile'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

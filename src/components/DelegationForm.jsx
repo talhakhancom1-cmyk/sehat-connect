@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { toUserError } from '@/lib/userError';
 
 const scopes = [
   { value: 'booking', label: 'Book appointments', hint: 'Can book appointments on your behalf' },
@@ -21,14 +22,22 @@ export default function DelegationForm({ members, onGrant, onClose }) {
   const [cats, setCats] = useState([]);
   const [expiresHours, setExpiresHours] = useState(24);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const toggleCat = (c) => setCats((cs) => cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]);
 
   const submit = async () => {
     if (!memberId) return;
     setSaving(true);
-    await onGrant({ delegatee_user_id: memberId, scope, record_view_categories: scope === 'record_view' ? cats : [], expires_hours: Number(expiresHours) });
-    setSaving(false);
+    setError('');
+    try {
+      await onGrant({ delegatee_user_id: memberId, scope, record_view_categories: scope === 'record_view' ? cats : [], expires_hours: Number(expiresHours) });
+    } catch (e) {
+      console.error(e);
+      setError(toUserError(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -75,6 +84,9 @@ export default function DelegationForm({ members, onGrant, onClose }) {
             <input type="number" min={1} value={expiresHours} onChange={(e) => setExpiresHours(e.target.value)} className="mt-1 w-full h-10 rounded-xl border border-input bg-background px-3 text-sm" />
           </div>
         </div>
+        {error && (
+          <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-t border-red-100">{error}</div>
+        )}
         <div className="sticky bottom-0 bg-card flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={saving || !memberId || (scope === 'record_view' && cats.length === 0)}>{saving ? 'Granting…' : 'Grant access'}</Button>

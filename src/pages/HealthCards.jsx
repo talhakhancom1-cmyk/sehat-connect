@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { issueCardToken, revokeToken, buildVerifyUrl } from '@/lib/healthCard';
 import { HeartPulse, Pill, AlertTriangle, Syringe, ShieldAlert, Baby, Plus, QrCode, Copy, Ban, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const typeIcon = {
   emergency: HeartPulse, medication: Pill, allergy: AlertTriangle, vaccination: Syringe,
@@ -60,15 +61,20 @@ export default function HealthCards() {
       setShowForm(false);
       load();
     } catch (e) {
-      toast({ title: 'Could not create card', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not create card', description: toUserError(e), variant: 'destructive' });
     }
   };
 
   const revokeCard = async (card) => {
     if (!confirm(`Revoke "${card.title}"? This disables the card and all its tokens.`)) return;
-    await base44.entities.HealthCard.update(card.id, { status: 'revoked' });
-    toast({ title: 'Card revoked' });
-    load();
+    try {
+      await base44.entities.HealthCard.update(card.id, { status: 'revoked' });
+      toast({ title: 'Card revoked' });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Could not revoke card', description: toUserError(e), variant: 'destructive' });
+    }
   };
 
   const issueToken = async (card) => {
@@ -78,14 +84,19 @@ export default function HealthCards() {
       toast({ title: 'Access QR generated' });
       load();
     } catch (e) {
-      toast({ title: 'Could not generate QR', description: e.message, variant: 'destructive' });
+      toast({ title: 'Could not generate QR', description: toUserError(e), variant: 'destructive' });
     } finally { setIssuing(false); }
   };
 
   const onRevokeToken = async (id) => {
-    await revokeToken(id);
-    toast({ title: 'Token revoked' });
-    load();
+    try {
+      await revokeToken(id);
+      toast({ title: 'Token revoked' });
+      load();
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Could not revoke token', description: toUserError(e), variant: 'destructive' });
+    }
   };
 
   const copyLink = (url) => {

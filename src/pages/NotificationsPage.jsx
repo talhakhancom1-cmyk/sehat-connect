@@ -20,7 +20,11 @@ export default function NotificationsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setItems(await listNotifications(50));
+    try {
+      setItems(await listNotifications(50));
+    } catch {
+      setItems([]);
+    }
     setLoading(false);
   }, []);
 

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Camera, Loader2, User as UserIcon, KeyRound, ShieldAlert } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
+import { toUserError } from '@/lib/userError';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const TOKEN_KEY = 'ehc_token';
@@ -98,7 +99,7 @@ export default function EditProfile() {
       setProfilePicUrl(fullUrl);
       toast({ title: 'Photo uploaded' });
     } catch (err) {
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Upload failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -130,7 +131,7 @@ export default function EditProfile() {
       await checkUserAuth();
       toast({ title: 'Profile updated' });
     } catch (err) {
-      toast({ title: 'Update failed', description: err.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Update failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -149,7 +150,7 @@ export default function EditProfile() {
       await checkUserAuth();
       toast({ title: 'Medical info updated' });
     } catch (err) {
-      toast({ title: 'Update failed', description: err.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Update failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setSavingMedical(false);
     }
@@ -177,7 +178,7 @@ export default function EditProfile() {
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
-      toast({ title: 'Password change failed', description: err.message || 'Please try again', variant: 'destructive' });
+      toast({ title: 'Password change failed', description: toUserError(err), variant: 'destructive' });
     } finally {
       setChangingPassword(false);
     }

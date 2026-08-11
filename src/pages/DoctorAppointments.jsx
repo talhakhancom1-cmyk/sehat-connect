@@ -8,11 +8,14 @@ import { cn } from '@/lib/utils';
 import { ShieldCheck, Clock, ClipboardList } from 'lucide-react';
 import PatientOverviewDialog from '@/components/PatientOverviewDialog';
 import { useCallInitiator } from '@/lib/useCallInitiator';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 const tabs = ['all', 'pending', 'confirmed', 'in_progress', 'completed', 'rejected'];
 
 export default function DoctorAppointments() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
@@ -58,6 +61,7 @@ export default function DoctorAppointments() {
       load();
     } catch (e) {
       console.error(e);
+      toast({ title: 'Action failed', description: toUserError(e), variant: 'destructive' });
     } finally {
       setActionId(null);
     }

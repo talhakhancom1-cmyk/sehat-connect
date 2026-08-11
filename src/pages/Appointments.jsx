@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useCallInitiator } from '@/lib/useCallInitiator';
 import { useAppointmentCallGate } from '@/lib/useAppointmentCallGate';
 import WaitingRoom from '@/components/WaitingRoom';
+import { toUserError } from '@/lib/userError';
 
 const tabs = ['all', 'pending', 'confirmed', 'completed', 'cancelled'];
 
@@ -46,7 +47,7 @@ export default function Appointments() {
       load();
     } catch (e) {
       console.error(e);
-      toast({ title: 'Could not cancel appointment', variant: 'destructive' });
+      toast({ title: 'Could not cancel appointment', description: toUserError(e), variant: 'destructive' });
     } finally {
       setCancellingId(null);
     }

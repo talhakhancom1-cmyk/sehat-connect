@@ -10,6 +10,13 @@ const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
 const { sendNotification } = require('../lib/notificationDispatcher');
+const {
+  validateNumericRange, validateStringLength, validateEnum,
+  validateFutureDate, validateTimeFormat, sanitizeError
+} = require('../lib/validate');
+
+const APPOINTMENT_TYPES = ['video', 'audio', 'chat', 'physical', 'home', 'emergency'];
+const APPOINTMENT_STATUSES = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rejected'];
 
 // Fields that can be set on an Appointment
 const APPOINTMENT_WRITABLE_FIELDS = [
@@ -148,6 +155,37 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const body = pickFields(req.body, APPOINTMENT_WRITABLE_FIELDS);
+    // --- Server-side validation ---
+    if (body.appointment_date) {
+      const d = new Date(body.appointment_date);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'appointment_date must be a valid date' });
+      }
+      const err = validateFutureDate(body.appointment_date, 'appointment_date');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.time_slot) {
+      const err = validateTimeFormat(body.time_slot, 'time_slot');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.type) {
+      const err = validateEnum(body.type, APPOINTMENT_TYPES, 'type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.status) {
+      const err = validateEnum(body.status, APPOINTMENT_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (body.consultation_fee !== undefined && body.consultation_fee !== null && body.consultation_fee !== '') {
+      const err = validateNumericRange(body.consultation_fee, 0, 1000000, 'consultation_fee');
+      if (err) return res.status(400).json({ error: err });
+    }
+    for (const f of ['reason', 'notes', 'symptoms']) {
+      if (body[f] !== undefined && body[f] !== null) {
+        const err = validateStringLength(body[f], 2000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
+    }
     if (!isAdmin(req.user)) {
       body.patient_id = req.user.id;
       body.patient_name = req.user.display_name || req.user.full_name || req.user.email || 'Patient';
@@ -203,7 +241,7 @@ router.post('/', authenticate, async (req, res) => {
 
     res.status(201).json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date) });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 
@@ -216,6 +254,36 @@ router.put('/:id', authenticate, async (req, res) => {
     }
     if (!(await canAccessAppointment(appointment, req.user))) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+    // --- Server-side validation (updates) ---
+    const upd = req.body || {};
+    if (upd.appointment_date !== undefined && upd.appointment_date !== null && upd.appointment_date !== '') {
+      const d = new Date(upd.appointment_date);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'appointment_date must be a valid date' });
+      }
+    }
+    if (upd.time_slot) {
+      const err = validateTimeFormat(upd.time_slot, 'time_slot');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.type) {
+      const err = validateEnum(upd.type, APPOINTMENT_TYPES, 'type');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.status) {
+      const err = validateEnum(upd.status, APPOINTMENT_STATUSES, 'status');
+      if (err) return res.status(400).json({ error: err });
+    }
+    if (upd.consultation_fee !== undefined && upd.consultation_fee !== null && upd.consultation_fee !== '') {
+      const err = validateNumericRange(upd.consultation_fee, 0, 1000000, 'consultation_fee');
+      if (err) return res.status(400).json({ error: err });
+    }
+    for (const f of ['reason', 'notes', 'symptoms']) {
+      if (upd[f] !== undefined && upd[f] !== null) {
+        const err = validateStringLength(upd[f], 2000, f);
+        if (err) return res.status(400).json({ error: err });
+      }
     }
     // Non-admins: the doctor can only update status/notes, never payment fields
     // (that would let a doctor fake-approve an unpaid appointment). The patient,
@@ -268,7 +336,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     res.json({ ...appointment.toJSON(), appointment_date: normalizeDate(appointment.appointment_date) });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: sanitizeError(error) });
   }
 });
 

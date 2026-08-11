@@ -6,10 +6,13 @@ import StatusBadge from '@/components/StatusBadge';
 import { recordAudit } from '@/lib/audit';
 import { Search, ShieldCheck, Ban, RotateCcw, Stethoscope, FileText, X, ExternalLink } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { toUserError } from '@/lib/userError';
 
 const tabs = ['all', 'pending', 'verified', 'suspended'];
 
 export default function AdminDoctors() {
+  const { toast } = useToast();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all');
@@ -43,6 +46,7 @@ export default function AdminDoctors() {
       load();
     } catch (e) {
       console.error(e);
+      toast({ title: 'Action failed', description: toUserError(e), variant: 'destructive' });
     } finally {
       setVerifyingId(null);
     }
