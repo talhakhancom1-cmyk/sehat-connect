@@ -2,16 +2,12 @@ const express = require('express');
 const { Op } = require('sequelize');
 const { Prescription, PrescriptionItem, Doctor } = require('../models');
 const { authenticate } = require('../middleware/auth');
-const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
+const { canAccessPrescription, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
-
-function isAdmin(user) {
-  return ADMIN_ROLES.includes(user.role);
-}
 
 // Map a PrescriptionItem row to the frontend-expected medication shape
 function itemToMedication(item) {
@@ -91,6 +87,17 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'items/medications array is required' });
     }
 
+    // Ensure the caller has a legitimate relationship with the patient.
+    // Doctors must have a patient relationship; patients can only create
+    // prescriptions for themselves; admins are exempt.
+    if (!isAdmin(req.user)) {
+      const probe = { patient_id: body.patient_id, doctor_id: body.doctor_id, doctor_user_id: req.user.id };
+      const allowed = await canAccessPrescription(probe, req.user);
+      if (!allowed && body.patient_id !== req.user.id) {
+        return res.status(403).json({ error: 'Forbidden — no patient relationship found for this patient_id' });
+      }
+    }
+
     const prescription = await Prescription.create({
       patient_id: body.patient_id,
       patient_name: body.patient_name,
@@ -132,6 +139,10 @@ router.get('/:id', authenticate, async (req, res) => {
     const prescription = await Prescription.findByPk(req.params.id);
     if (!prescription) {
       return res.status(404).json({ error: 'Prescription not found' });
+    }
+    const allowed = await canAccessPrescription(prescription, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this prescription' });
     }
     const items = await PrescriptionItem.findAll({
       where: { prescription_id: prescription.id },

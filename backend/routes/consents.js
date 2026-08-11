@@ -5,12 +5,9 @@ const { RECORD_CATEGORIES, ADMIN_ROLES } = require('../constants/ehc');
 const { authenticate } = require('../middleware/auth');
 const { recordAudit, auditFromRequest } = require('../lib/audit');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessConsent, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
-
-function isAdmin(user) {
-  return ADMIN_ROLES.includes(user.role);
-}
 
 const VALID_PERMISSIONS = ['view', 'download', 'print', 'add_clinical_note', 'add_prescription', 'add_verified_record', 'refer_forward'];
 
@@ -59,6 +56,11 @@ router.post('/', authenticate, async (req, res) => {
     const body = req.body || {};
     if (!body.patient_id || !body.recipient_user_id) {
       return res.status(400).json({ error: 'patient_id and recipient_user_id are required' });
+    }
+
+    // Only the patient (or an admin) can grant consent on their own behalf
+    if (!isAdmin(req.user) && body.patient_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden — patient_id must match the current user' });
     }
 
     const categories = normalizeCategories(body.categories);
@@ -122,6 +124,10 @@ router.post('/:id/revoke', authenticate, async (req, res) => {
     const consent = await Consent.findByPk(req.params.id);
     if (!consent) {
       return res.status(404).json({ error: 'Consent not found' });
+    }
+
+    if (!canAccessConsent(consent, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — only the patient who granted this consent can revoke it' });
     }
 
     await consent.update({ status: 'revoked', revoked_at: new Date() });

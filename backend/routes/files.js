@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { UploadedFile } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { uploadFile, getFileStream, deleteFile, ensureBucket, buildPublicUrl, getPresignedDownloadUrl } = require('../config/minio');
+const { canAccessFile } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -127,6 +128,9 @@ router.post('/:fileId/share', authenticate, async (req, res) => {
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
+    if (!canAccessFile({ uploaded_by_user_id: file.owner_id }, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this file' });
+    }
     const token = crypto.randomBytes(32).toString('hex');
     const expiresInHours = Number(req.body && req.body.expires_in_hours) || 72;
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
@@ -149,6 +153,9 @@ router.post('/:fileId/revoke', authenticate, async (req, res) => {
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
+    if (!canAccessFile({ uploaded_by_user_id: file.owner_id }, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this file' });
+    }
     await file.update({ shared_token: null, shared_token_expires_at: null, status: 'revoked' });
     res.json({ message: 'Share revoked' });
   } catch (error) {
@@ -162,6 +169,9 @@ router.delete('/:fileId', authenticate, async (req, res) => {
     const file = await UploadedFile.findByPk(req.params.fileId);
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
+    }
+    if (!canAccessFile({ uploaded_by_user_id: file.owner_id }, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this file' });
     }
     // Delete from MinIO (best-effort)
     try {

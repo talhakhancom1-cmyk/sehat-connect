@@ -1,6 +1,7 @@
 const express = require('express');
 const { Encounter, Appointment } = require('../models');
 const { authenticate } = require('../middleware/auth');
+const { canAccessEncounter, canAccessAppointment } = require('../lib/ownership');
 
 const router = express.Router({ mergeParams: true });
 
@@ -21,6 +22,10 @@ router.get('/', authenticate, async (req, res) => {
     if (!encounter) {
       return res.status(404).json({ error: 'Encounter not found' });
     }
+    const allowed = await canAccessEncounter(encounter, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this encounter' });
+    }
     res.json(encounter);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -32,6 +37,11 @@ router.post('/', authenticate, async (req, res) => {
     const appointment = await Appointment.findByPk(req.params.appointmentId);
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const canAccess = await canAccessAppointment(appointment, req.user);
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this appointment' });
     }
 
     const existing = await Encounter.findOne({
@@ -80,6 +90,11 @@ router.patch('/complete', authenticate, async (req, res) => {
     });
     if (!encounter) {
       return res.status(404).json({ error: 'Encounter not found' });
+    }
+
+    const canAccess = await canAccessEncounter(encounter, req.user);
+    if (!canAccess) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this encounter' });
     }
 
     await appointment.update({ status: 'completed' });

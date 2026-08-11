@@ -2,6 +2,7 @@ const express = require('express');
 const { Op } = require('sequelize');
 const { Conversation, Message, Doctor, User } = require('../models');
 const { authenticate } = require('../middleware/auth');
+const { canAccessConversation, isAdmin } = require('../lib/ownership');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
 
@@ -26,9 +27,19 @@ router.get('/conversations', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const where = {};
-    // Support filtering by patient_id, doctor_id, appointment_id from query params
-    if (req.query.patient_id) where.patient_id = req.query.patient_id;
-    if (req.query.doctor_id) where.doctor_id = req.query.doctor_id;
+    // Security: non-admins can only filter by their own patient_id/doctor_id
+    if (req.query.patient_id) {
+      if (req.query.patient_id !== userId && !isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden — you can only view your own conversations' });
+      }
+      where.patient_id = req.query.patient_id;
+    }
+    if (req.query.doctor_id) {
+      if (req.query.doctor_id !== userId && !isAdmin(req.user)) {
+        return res.status(403).json({ error: 'Forbidden — you can only view your own conversations' });
+      }
+      where.doctor_id = req.query.doctor_id;
+    }
     if (req.query.appointment_id) where.appointment_id = req.query.appointment_id;
     if (req.query.status) where.status = req.query.status;
 
@@ -87,6 +98,15 @@ router.get('/conversations', authenticate, async (req, res) => {
 router.post('/conversations', authenticate, async (req, res) => {
   try {
     const body = req.body || {};
+    // Security: the creator must be either the patient or the doctor in the conversation
+    // (or an admin). This prevents creating conversations impersonating other users.
+    if (!isAdmin(req.user)) {
+      const isPatient = body.patient_id && body.patient_id === req.user.id;
+      const isDoctor = body.doctor_id && body.doctor_id === req.user.id;
+      if (!isPatient && !isDoctor) {
+        return res.status(403).json({ error: 'Forbidden — you can only create conversations involving yourself' });
+      }
+    }
     const memberIds = Array.isArray(body.member_ids) ? body.member_ids : [];
     // Always include patient_id and doctor_id in member_ids
     if (body.patient_id && !memberIds.includes(body.patient_id)) memberIds.push(body.patient_id);
@@ -122,6 +142,9 @@ router.get('/conversations/:conversationId', authenticate, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
+    }
     const [doctor, patient] = await Promise.all([
       conversation.doctor_id ? Doctor.findOne({ where: { user_id: conversation.doctor_id } }).catch(() => null) : null,
       conversation.patient_id ? User.findByPk(conversation.patient_id).catch(() => null) : null,
@@ -146,6 +169,9 @@ router.put('/conversations/:conversationId', authenticate, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
+    }
     const updates = pickFields(req.body, CONVERSATION_WRITABLE);
     if (Array.isArray(updates.member_ids)) {
       updates.member_ids = JSON.stringify(updates.member_ids);
@@ -169,6 +195,9 @@ router.get('/conversations/:conversationId/messages', authenticate, async (req, 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
+    }
     const messages = await Message.findAll({
       where: { conversation_id: req.params.conversationId },
       order: [['created_at', 'ASC']],
@@ -191,6 +220,9 @@ router.post('/conversations/:conversationId/messages', authenticate, async (req,
     const conversation = await Conversation.findByPk(req.params.conversationId);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
+    }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
     }
     const body = req.body || {};
     const message = await Message.create({
@@ -255,15 +287,12 @@ router.post('/conversations/:conversationId/messages/:messageId/read', authentic
 router.get('/messages', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
+    // Security: non-admins can only see messages they sent or received
     const where = { [Op.or]: [{ sender_id: userId }, { receiver_id: userId }] };
-    // Support additional filters from query params
+    // Support additional filters from query params (but don't override the user scope)
     if (req.query.conversation_id) where.conversation_id = req.query.conversation_id;
-    if (req.query.sender_id) {
-      where[Op.or] = [{ sender_id: req.query.sender_id }];
-    }
-    if (req.query.receiver_id) {
-      where[Op.or] = [{ receiver_id: req.query.receiver_id }];
-    }
+    // Note: sender_id/receiver_id filters from query are ignored for non-admins
+    // to prevent enumerating other users' messages
     const { offset, limit } = paginate(req);
     const { rows, count } = await Message.findAndCountAll({
       where,
@@ -292,6 +321,9 @@ router.post('/messages', authenticate, async (req, res) => {
     const conversation = await Conversation.findByPk(body.conversation_id);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
+    }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
     }
 
     if (body.client_message_id) {
@@ -347,6 +379,9 @@ router.post('/conversations/:conversationId/call-log', authenticate, async (req,
     const conversation = await Conversation.findByPk(conversationId);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
+    }
+    if (!canAccessConversation(conversation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this conversation' });
     }
 
     // If call_id is provided, try to find an existing call log to update.

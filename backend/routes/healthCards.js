@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { HealthCard, HealthCardShare } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessHealthCard, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 const patientRouter = express.Router({ mergeParams: true });
@@ -43,10 +44,13 @@ patientRouter.post('/', authenticate, async (req, res) => {
 router.get('/', authenticate, async (req, res) => {
   try {
     const where = {};
-    if (req.query.patient_id) where.patient_id = req.query.patient_id;
+    if (req.query.patient_id) {
+      // Non-admins can only query their own patient_id
+      where.patient_id = isAdmin(req.user) ? req.query.patient_id : req.user.id;
+    }
     if (req.query.status) where.status = req.query.status;
     if (req.query.card_type) where.card_type = req.query.card_type;
-    if (!Object.keys(where).length) where.patient_id = req.user.id;
+    if (!where.patient_id && !isAdmin(req.user)) where.patient_id = req.user.id;
     const cards = await HealthCard.findAll({
       where,
       order: parseSort(req.query, ['created_at', 'updated_at'], 'created_at', 'DESC'),
@@ -100,6 +104,9 @@ router.get('/:cardId', authenticate, async (req, res) => {
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
     }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
+    }
     res.json(card);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -111,6 +118,9 @@ router.patch('/:cardId', authenticate, async (req, res) => {
     const card = await HealthCard.findByPk(req.params.cardId);
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
+    }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
     }
     const updates = { ...req.body };
     if (updates.card_type && !HealthCard.CARD_TYPES.includes(updates.card_type)) {
@@ -135,6 +145,9 @@ router.put('/:cardId', authenticate, async (req, res) => {
     const card = await HealthCard.findByPk(req.params.cardId);
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
+    }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
     }
     const updates = { ...req.body };
     if (updates.card_type && !HealthCard.CARD_TYPES.includes(updates.card_type)) {
@@ -163,6 +176,9 @@ router.post('/:cardId/share', authenticate, async (req, res) => {
     const card = await HealthCard.findByPk(req.params.cardId);
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
+    }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
     }
     const token = crypto.randomBytes(24).toString('hex');
     const expiresInHours = Number(req.body && req.body.expires_in_hours) || 168;
@@ -193,6 +209,9 @@ router.post('/:cardId/revoke', authenticate, async (req, res) => {
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
     }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
+    }
     await card.update({ shared_token: null, shared_token_expires_at: null });
     await HealthCardShare.update(
       { revoked_at: new Date() },
@@ -209,6 +228,9 @@ router.delete('/:cardId', authenticate, async (req, res) => {
     const card = await HealthCard.findByPk(req.params.cardId);
     if (!card) {
       return res.status(404).json({ error: 'Health card not found' });
+    }
+    if (!canAccessHealthCard(card, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this health card' });
     }
     await card.destroy();
     res.json({ message: 'Health card deleted' });

@@ -4,6 +4,7 @@ const { IPS, IPSSourceRecord, MedicalRecord } = require('../models');
 const { RECORD_CATEGORIES } = require('../constants/ehc');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessMedicalRecord, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 const patientRouter = express.Router({ mergeParams: true });
@@ -42,6 +43,13 @@ function buildSummary(patientId, patientName, records) {
 patientRouter.post('/', authenticate, async (req, res) => {
   try {
     const { patientId } = req.params;
+    // Ensure the caller is the patient or a doctor with a relationship (or admin)
+    if (!isAdmin(req.user) && patientId !== req.user.id) {
+      const allowed = await canAccessMedicalRecord({ patient_id: patientId }, req.user);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden — you do not have access to this patient\'s records' });
+      }
+    }
     const body = req.body || {};
     const categories = Array.isArray(body.categories) && body.categories.length > 0
       ? body.categories
@@ -85,6 +93,13 @@ patientRouter.post('/', authenticate, async (req, res) => {
 
 patientRouter.get('/', authenticate, async (req, res) => {
   try {
+    const { patientId } = req.params;
+    if (!isAdmin(req.user) && patientId !== req.user.id) {
+      const allowed = await canAccessMedicalRecord({ patient_id: patientId }, req.user);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden — you do not have access to this patient\'s IPS' });
+      }
+    }
     const list = await IPS.findAll({
       where: { patient_id: req.params.patientId },
       order: parseSort(req.query, ['version', 'created_at', 'date'], 'version', 'DESC')
@@ -100,6 +115,12 @@ router.get('/:ipsId', authenticate, async (req, res) => {
     const ips = await IPS.findByPk(req.params.ipsId);
     if (!ips) {
       return res.status(404).json({ error: 'IPS not found' });
+    }
+    if (!isAdmin(req.user) && ips.patient_id !== req.user.id) {
+      const allowed = await canAccessMedicalRecord({ patient_id: ips.patient_id }, req.user);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden — you do not have access to this IPS' });
+      }
     }
     res.json(ips);
   } catch (error) {
@@ -181,6 +202,12 @@ router.post('/:ipsId/share', authenticate, async (req, res) => {
     if (!ips) {
       return res.status(404).json({ error: 'IPS not found' });
     }
+    if (!isAdmin(req.user) && ips.patient_id !== req.user.id) {
+      const allowed = await canAccessMedicalRecord({ patient_id: ips.patient_id }, req.user);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden — you do not have access to this IPS' });
+      }
+    }
     const token = crypto.randomBytes(32).toString('hex');
     const expiresInHours = Number(req.body && req.body.expires_in_hours) || 72;
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
@@ -201,6 +228,12 @@ router.post('/:ipsId/revoke', authenticate, async (req, res) => {
     const ips = await IPS.findByPk(req.params.ipsId);
     if (!ips) {
       return res.status(404).json({ error: 'IPS not found' });
+    }
+    if (!isAdmin(req.user) && ips.patient_id !== req.user.id) {
+      const allowed = await canAccessMedicalRecord({ patient_id: ips.patient_id }, req.user);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden — you do not have access to this IPS' });
+      }
     }
     await ips.update({
       shared_token: null,

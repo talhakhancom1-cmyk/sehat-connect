@@ -1,6 +1,7 @@
 const express = require('express');
 const { CallRoom, CallParticipant } = require('../models');
 const { authenticate } = require('../middleware/auth');
+const { isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -65,6 +66,15 @@ router.get('/:callId', authenticate, async (req, res) => {
     const room = await CallRoom.findByPk(req.params.callId);
     if (!room) {
       return res.status(404).json({ error: 'Call room not found' });
+    }
+    // Only allow participants (or admins) to access the call
+    if (!isAdmin(req.user)) {
+      const participant = await CallParticipant.findOne({
+        where: { call_room_id: room.id, user_id: req.user.id }
+      });
+      if (!participant) {
+        return res.status(403).json({ error: 'Forbidden — you are not a participant of this call' });
+      }
     }
     const participants = await CallParticipant.findAll({
       where: { call_room_id: room.id }
@@ -153,6 +163,15 @@ router.post('/:callId/end', authenticate, async (req, res) => {
     const room = await CallRoom.findByPk(req.params.callId);
     if (!room) {
       return res.status(404).json({ error: 'Call room not found' });
+    }
+    // Only allow participants (or admins) to end the call
+    if (!isAdmin(req.user)) {
+      const participant = await CallParticipant.findOne({
+        where: { call_room_id: room.id, user_id: req.user.id }
+      });
+      if (!participant) {
+        return res.status(403).json({ error: 'Forbidden — you are not a participant of this call' });
+      }
     }
     await room.update({
       status: 'ended',

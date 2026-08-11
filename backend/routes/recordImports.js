@@ -1,8 +1,9 @@
 const express = require('express');
 const { RecordImport, RecordImportFile, RecordImportVersion, MedicalRecord } = require('../models');
 const { RECORD_CATEGORIES, PROVENANCE } = require('../constants/ehc');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireRole } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessMedicalRecord, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 const patientRouter = express.Router({ mergeParams: true });
@@ -36,6 +37,11 @@ router.post('/', authenticate, async (req, res) => {
     const patientId = body.patient_id || req.params.patientId;
     if (!patientId) {
       return res.status(400).json({ error: 'patient_id is required' });
+    }
+    // Non-admins can only create imports for themselves (doctors use the
+    // verify endpoint, not the create endpoint).
+    if (!isAdmin(req.user) && patientId !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden — patient_id must match the current user' });
     }
     if (!body.category) {
       return res.status(400).json({ error: 'category is required' });
@@ -79,6 +85,10 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!recordImport) {
       return res.status(404).json({ error: 'Record import not found' });
     }
+    const allowed = await canAccessMedicalRecord({ patient_id: recordImport.patient_id }, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this record import' });
+    }
     const files = await RecordImportFile.findAll({
       where: { record_import_id: recordImport.id }
     });
@@ -93,6 +103,10 @@ router.patch('/:id', authenticate, async (req, res) => {
     const recordImport = await RecordImport.findByPk(req.params.id);
     if (!recordImport) {
       return res.status(404).json({ error: 'Record import not found' });
+    }
+    const allowed = await canAccessMedicalRecord({ patient_id: recordImport.patient_id }, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this record import' });
     }
     if (recordImport.status !== 'draft') {
       return res.status(400).json({ error: 'Only draft imports can be edited' });
@@ -115,6 +129,10 @@ router.post('/:id/files', authenticate, async (req, res) => {
     const recordImport = await RecordImport.findByPk(req.params.id);
     if (!recordImport) {
       return res.status(404).json({ error: 'Record import not found' });
+    }
+    const allowed = await canAccessMedicalRecord({ patient_id: recordImport.patient_id }, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this record import' });
     }
     const { file_url, file_type, file_name, captured_from_camera } = req.body || {};
     if (!file_url) {
@@ -140,6 +158,10 @@ router.post('/:id/submit', authenticate, async (req, res) => {
     if (!recordImport) {
       return res.status(404).json({ error: 'Record import not found' });
     }
+    const allowed = await canAccessMedicalRecord({ patient_id: recordImport.patient_id }, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this record import' });
+    }
     if (recordImport.status !== 'draft') {
       return res.status(400).json({ error: 'Only draft imports can be submitted' });
     }
@@ -157,7 +179,7 @@ router.post('/:id/submit', authenticate, async (req, res) => {
   }
 });
 
-router.post('/:id/verify', authenticate, async (req, res) => {
+router.post('/:id/verify', authenticate, requireRole(['doctor', 'super_admin', 'clinic_admin']), async (req, res) => {
   try {
     const recordImport = await RecordImport.findByPk(req.params.id);
     if (!recordImport) {
@@ -191,6 +213,10 @@ router.post('/:id/amendments', authenticate, async (req, res) => {
     const recordImport = await RecordImport.findByPk(req.params.id);
     if (!recordImport) {
       return res.status(404).json({ error: 'Record import not found' });
+    }
+    const allowed = await canAccessMedicalRecord({ patient_id: recordImport.patient_id }, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this record import' });
     }
     const { amendment_reason, new_data } = req.body || {};
     await RecordImportVersion.create({

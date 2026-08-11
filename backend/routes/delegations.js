@@ -2,6 +2,7 @@ const express = require('express');
 const { Delegation } = require('../models');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessDelegation, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -10,10 +11,16 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const where = {};
     if (req.query.household_id) where.household_id = req.query.household_id;
-    if (req.query.delegator_user_id) where.delegator_user_id = req.query.delegator_user_id;
-    if (req.query.delegatee_user_id) where.delegatee_user_id = req.query.delegatee_user_id;
     if (req.query.status) where.status = req.query.status;
     if (req.query.scope) where.scope = req.query.scope;
+    // Non-admins only see delegations where they are the delegator or delegatee
+    if (!isAdmin(req.user)) {
+      const { Op } = require('sequelize');
+      where[Op.or] = [{ delegator_user_id: req.user.id }, { delegatee_user_id: req.user.id }];
+    } else {
+      if (req.query.delegator_user_id) where.delegator_user_id = req.query.delegator_user_id;
+      if (req.query.delegatee_user_id) where.delegatee_user_id = req.query.delegatee_user_id;
+    }
     const delegations = await Delegation.findAll({
       where,
       order: parseSort(req.query, ['granted_at', 'created_at', 'updated_at', 'expires_at'], 'granted_at', 'DESC'),
@@ -36,6 +43,9 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const delegation = await Delegation.findByPk(req.params.id);
     if (!delegation) return res.status(404).json({ error: 'Delegation not found' });
+    if (!canAccessDelegation(delegation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this delegation' });
+    }
     res.json({
       ...delegation.toJSON(),
       granted_at: delegation.granted_at || delegation.created_at,
@@ -53,6 +63,11 @@ router.post('/', authenticate, async (req, res) => {
     if (!body.delegator_user_id) return res.status(400).json({ error: 'delegator_user_id is required' });
     if (!body.delegatee_user_id) return res.status(400).json({ error: 'delegatee_user_id is required' });
     if (!body.scope) return res.status(400).json({ error: 'scope is required' });
+
+    // Non-admins can only create delegations where they are the delegator
+    if (!isAdmin(req.user) && body.delegator_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden — delegator_user_id must match the current user' });
+    }
 
     const delegation = await Delegation.create({
       household_id: body.household_id || null,
@@ -82,6 +97,9 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const delegation = await Delegation.findByPk(req.params.id);
     if (!delegation) return res.status(404).json({ error: 'Delegation not found' });
+    if (!canAccessDelegation(delegation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this delegation' });
+    }
     const updates = { ...req.body };
     delete updates.id;
     await delegation.update(updates);
@@ -100,6 +118,9 @@ router.delete('/:id', authenticate, async (req, res) => {
   try {
     const delegation = await Delegation.findByPk(req.params.id);
     if (!delegation) return res.status(404).json({ error: 'Delegation not found' });
+    if (!canAccessDelegation(delegation, req.user)) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this delegation' });
+    }
     await delegation.destroy();
     res.json({ message: 'Delegation deleted' });
   } catch (error) {

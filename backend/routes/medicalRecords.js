@@ -4,10 +4,10 @@ const router = express.Router();
 const MedicalRecord = require('../models/MedicalRecord');
 const Doctor = require('../models/Doctor');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { ADMIN_ROLES } = require('../constants/ehc');
 const { parseSort } = require('../lib/parseSort');
 const { paginate, buildPaginatedResponse } = require('../lib/paginate');
 const { pickFields } = require('../lib/pickFields');
+const { canAccessMedicalRecord, isAdmin, isDoctor } = require('../lib/ownership');
 
 // Fields that can be set on a MedicalRecord
 const RECORD_WRITABLE_FIELDS = [
@@ -18,14 +18,6 @@ const RECORD_WRITABLE_FIELDS = [
   'consent_id', 'encounter_id', 'verification_status',
   'verified_by_id', 'verified_by_name', 'verified_at', 'shared_with_doctor_ids'
 ];
-
-function isAdmin(user) {
-  return ADMIN_ROLES.includes(user.role);
-}
-
-function isDoctor(user) {
-  return user.role === 'doctor';
-}
 
 // Get medical records.
 // - Admins: can see all records, optionally filtered by patient_id/patient_name.
@@ -83,8 +75,9 @@ router.get('/:id', authenticate, async (req, res) => {
     if (!record) {
       return res.status(404).json({ error: 'Medical record not found' });
     }
-    if (!isAdmin(req.user) && record.patient_id !== req.user.id && !isDoctor(req.user)) {
-      return res.status(403).json({ error: 'Forbidden' });
+    const allowed = await canAccessMedicalRecord(record, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this medical record' });
     }
     res.json(record);
   } catch (error) {
@@ -97,7 +90,18 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const body = pickFields(req.body, RECORD_WRITABLE_FIELDS);
     if (!isAdmin(req.user)) {
-      body.patient_id = req.user.id;
+      // Doctors may create records for their patients; everyone else is
+      // scoped to their own patient_id.
+      if (isDoctor(req.user) && body.patient_id && body.patient_id !== req.user.id) {
+        // Verify the doctor has a legitimate relationship with this patient
+        const probeRecord = { patient_id: body.patient_id };
+        const hasRelationship = await canAccessMedicalRecord(probeRecord, req.user);
+        if (!hasRelationship) {
+          return res.status(403).json({ error: 'Forbidden — no patient relationship found for this patient_id' });
+        }
+      } else {
+        body.patient_id = req.user.id;
+      }
       // Auto-fill patient_name from the authenticated user if not provided
       if (!body.patient_name) {
         body.patient_name = req.user.display_name || req.user.full_name || req.user.email || 'Patient';

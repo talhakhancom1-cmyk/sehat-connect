@@ -13,6 +13,7 @@ const { DELEGATION_SCOPES } = require('../models/HouseholdInvitation');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
 const { pickFields } = require('../lib/pickFields');
+const { canAccessHousehold } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -124,6 +125,10 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const household = await Household.findByPk(req.params.id);
     if (!household) return res.status(404).json({ error: 'Household not found' });
+    const allowed = await canAccessHousehold(household, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this household' });
+    }
     const members = await HouseholdMember.findAll({ where: { household_id: household.id } });
     res.json({
       ...household.toJSON(),
@@ -142,6 +147,10 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const household = await Household.findByPk(req.params.id);
     if (!household) return res.status(404).json({ error: 'Household not found' });
+    const allowed = await canAccessHousehold(household, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you are not a member of this household' });
+    }
     const updates = pickFields(req.body, HOUSEHOLD_WRITABLE);
     await household.update(updates);
     res.json({

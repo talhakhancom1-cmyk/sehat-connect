@@ -1,7 +1,9 @@
 const express = require('express');
-const { Review } = require('../models');
+const { Review, Doctor } = require('../models');
+const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -10,6 +12,17 @@ router.get('/', authenticate, async (req, res) => {
     const where = {};
     if (req.query.doctor_id) where.doctor_id = req.query.doctor_id;
     if (req.query.patient_id) where.patient_id = req.query.patient_id;
+    // Non-admins: scope to public reviews or their own reviews (as patient or doctor)
+    if (!isAdmin(req.user)) {
+      const doctorEntity = await Doctor.findOne({
+        where: req.user.email
+          ? { [Op.or]: [{ user_id: req.user.id }, { email: req.user.email }] }
+          : { user_id: req.user.id }
+      }).catch(() => null);
+      const ownership = [{ patient_id: req.user.id }];
+      if (doctorEntity) ownership.push({ doctor_id: doctorEntity.id });
+      where[Op.or] = ownership;
+    }
     const reviews = await Review.findAll({
       where,
       order: parseSort(req.query, ['date', 'created_at', 'rating'], 'date', 'DESC'),
@@ -26,6 +39,17 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const review = await Review.findByPk(req.params.id);
     if (!review) return res.status(404).json({ error: 'Review not found' });
+    // Allow if the user is the reviewer or the doctor being reviewed (or admin)
+    if (!isAdmin(req.user) && review.patient_id !== req.user.id) {
+      const doctorEntity = await Doctor.findOne({
+        where: req.user.email
+          ? { [Op.or]: [{ user_id: req.user.id }, { email: req.user.email }] }
+          : { user_id: req.user.id }
+      }).catch(() => null);
+      if (!doctorEntity || doctorEntity.id !== review.doctor_id) {
+        return res.status(403).json({ error: 'Forbidden — you can only view your own reviews or reviews about you' });
+      }
+    }
     res.json({ ...review.toJSON(), created_date: review.created_at });
   } catch (error) {
     res.status(500).json({ error: error.message });

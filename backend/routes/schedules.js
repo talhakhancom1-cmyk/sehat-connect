@@ -3,6 +3,7 @@ const { Schedule, Doctor, Appointment } = require('../models');
 const { Op } = require('sequelize');
 const { authenticate } = require('../middleware/auth');
 const { parseSort } = require('../lib/parseSort');
+const { canAccessSchedule, isAdmin } = require('../lib/ownership');
 
 const router = express.Router();
 
@@ -165,6 +166,17 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const body = req.body || {};
     if (!body.doctor_id) return res.status(400).json({ error: 'doctor_id is required' });
+    // Ensure the doctor_id belongs to the current user (or admin)
+    if (!isAdmin(req.user)) {
+      const doctor = await Doctor.findOne({
+        where: req.user.email
+          ? { [Op.or]: [{ user_id: req.user.id }, { email: req.user.email }] }
+          : { user_id: req.user.id }
+      }).catch(() => null);
+      if (!doctor || doctor.id !== body.doctor_id) {
+        return res.status(403).json({ error: 'Forbidden — doctor_id must belong to the current user' });
+      }
+    }
     const schedule = await Schedule.create({
       doctor_id: body.doctor_id,
       doctor_name: body.doctor_name || null,
@@ -186,6 +198,10 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const schedule = await Schedule.findByPk(req.params.id);
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
+    const allowed = await canAccessSchedule(schedule, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this schedule' });
+    }
     const updates = { ...req.body };
     delete updates.id;
     await schedule.update(updates);
@@ -200,6 +216,10 @@ router.delete('/:id', authenticate, async (req, res) => {
   try {
     const schedule = await Schedule.findByPk(req.params.id);
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
+    const allowed = await canAccessSchedule(schedule, req.user);
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden — you do not have access to this schedule' });
+    }
     await schedule.destroy();
     res.json({ message: 'Schedule deleted' });
   } catch (error) {
