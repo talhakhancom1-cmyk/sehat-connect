@@ -24,12 +24,25 @@ function isAdmin(user) {
 }
 
 // Normalize appointment_date to "YYYY-MM-DD" so the frontend always gets a
-// clean calendar date regardless of how PostgreSQL returns the timestamp.
+// clean calendar date regardless of how PostgreSQL/Sequelize returns the timestamp.
 // The actual time of the appointment lives in the `time_slot` field.
 function normalizeDate(value) {
   if (!value) return value;
+  // Handle Date objects from Sequelize — use ISO string which always contains 'T'
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
+  }
   const str = String(value);
-  return str.split('T')[0];
+  // If it's already an ISO string (contains 'T'), split on it
+  if (str.includes('T')) return str.split('T')[0];
+  // If it's a Date.toString() format like "Mon Aug 10 2026 00:00:00 GMT+0000",
+  // parse it back to a Date and extract the ISO date
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  // Last resort — return as-is
+  return str;
 }
 
 // Returns true if the user is the patient or the doctor on this appointment (or an admin).

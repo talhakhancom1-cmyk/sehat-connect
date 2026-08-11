@@ -52,13 +52,14 @@ export default function ChatThread() {
         // Fetch the appointment linked to this conversation (for waiting room)
         console.log('[ChatThread] conversation loaded:', { id: convo?.id, appointment_id: convo?.appointment_id, doctor_id: convo?.doctor_id, patient_id: convo?.patient_id });
         if (convo?.appointment_id) {
-          const appt = await base44.entities.Appointment.get(convo.appointment_id).catch((e) => {
-            console.error('[ChatThread] Failed to load appointment:', convo.appointment_id, e);
-            return null;
-          });
-          if (alive && appt) {
-            console.log('[ChatThread] appointment loaded:', { id: appt.id, date: appt.appointment_date, time_slot: appt.time_slot, status: appt.status });
-            setAppointment(appt);
+          try {
+            const appt = await base44.entities.Appointment.get(convo.appointment_id);
+            if (alive && appt) {
+              console.log('[ChatThread] appointment loaded:', { id: appt.id, date: appt.appointment_date, time_slot: appt.time_slot, status: appt.status });
+              setAppointment(appt);
+            }
+          } catch (e) {
+            console.error('[ChatThread] FAILED to load appointment:', convo.appointment_id, e?.message || e);
           }
         } else {
           console.warn('[ChatThread] No appointment_id on conversation — waiting room will not be enforced');
@@ -192,46 +193,62 @@ export default function ChatThread() {
     const isDoctor = user?.role === 'doctor' || user?.app_role === 'doctor' || role === 'doctor';
     console.log('[ChatThread] waiting room check:', { isDoctor, hasAppointment: !!appointment, appointmentId: appointment?.id });
     if (!isDoctor && appointment) {
-      // Check if the appointment time has arrived
-      const apptDate = new Date(appointment.appointment_date);
-      const timeSlot = appointment.time_slot || '';
-      const m = timeSlot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      if (m) {
-        let h = parseInt(m[1], 10);
-        const min = parseInt(m[2], 10);
-        const ap = m[3].toUpperCase();
-        if (ap === 'PM' && h !== 12) h += 12;
-        if (ap === 'AM' && h === 12) h = 0;
-        apptDate.setHours(h, min, 0, 0);
-      }
-
-      const now = new Date();
-      const EARLY_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
-      const earlyEntryTime = new Date(apptDate.getTime() - EARLY_BUFFER_MS);
-      const isActive = ['confirmed', 'in_progress', 'pending'].includes(appointment.status);
-      console.log('[ChatThread] time check:', { apptDate: apptDate.toISOString(), now: now.toISOString(), earlyEntry: earlyEntryTime.toISOString(), status: appointment.status, isActive, timeSlot });
-
-      if (isActive && now.getTime() < apptDate.getTime()) {
-        // Show waiting room (patient is within 10 min or too early)
-        if (now.getTime() >= earlyEntryTime.getTime()) {
-          // Within 10 min — show waiting room with countdown
-          console.log('[ChatThread] showing waiting room (within 10 min window)');
-          setWaitingRoom({ callType: video ? 'video' : 'audio' });
-          return;
+      // Parse the appointment date — could be "2026-08-10" (fixed) or a Date string (legacy)
+      const rawDate = appointment.appointment_date;
+      const apptDate = new Date(rawDate);
+      if (isNaN(apptDate.getTime())) {
+        console.error('[ChatThread] INVALID appointment date:', JSON.stringify(rawDate), '— proceeding without waiting room gate');
+      } else {
+        const timeSlot = appointment.time_slot || '';
+        const m = timeSlot.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (m) {
+          let h = parseInt(m[1], 10);
+          const min = parseInt(m[2], 10);
+          const ap = m[3].toUpperCase();
+          if (ap === 'PM' && h !== 12) h += 12;
+          if (ap === 'AM' && h === 12) h = 0;
+          apptDate.setHours(h, min, 0, 0);
         } else {
-          // Too early — show waiting room (it will show "too early" message)
-          console.log('[ChatThread] showing waiting room (too early)');
+          console.warn('[ChatThread] time_slot does not match expected format:', JSON.stringify(timeSlot));
+        }
+
+        const now = new Date();
+        const EARLY_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
+        const earlyEntryTime = new Date(apptDate.getTime() - EARLY_BUFFER_MS);
+        const isActive = ['confirmed', 'in_progress', 'pending'].includes(appointment.status);
+        console.log('[ChatThread] time check:', {
+          rawDate,
+          apptDate: apptDate.toISOString(),
+          now: now.toISOString(),
+          earlyEntry: earlyEntryTime.toISOString(),
+          status: appointment.status,
+          isActive,
+          timeSlot,
+          isBefore: now.getTime() < apptDate.getTime()
+        });
+
+        if (isActive && now.getTime() < apptDate.getTime()) {
+          // Show waiting room (patient is within 10 min or too early)
+          if (now.getTime() >= earlyEntryTime.getTime()) {
+            // Within 10 min — show waiting room with countdown
+            console.log('[ChatThread] showing waiting room (within 10 min window)');
+            setWaitingRoom({ callType: video ? 'video' : 'audio' });
+            return;
+          } else {
+            // Too early — show waiting room (it will show "too early" message)
+            console.log('[ChatThread] showing waiting room (too early)');
+            setWaitingRoom({ callType: video ? 'video' : 'audio' });
+            return;
+          }
+        } else if (!isActive) {
+          // Appointment not active — show waiting room (it will show "ended" message)
+          console.log('[ChatThread] showing waiting room (appointment not active, status=' + appointment.status + ')');
           setWaitingRoom({ callType: video ? 'video' : 'audio' });
           return;
         }
-      } else if (!isActive) {
-        // Appointment not active — show waiting room (it will show "ended" message)
-        console.log('[ChatThread] showing waiting room (appointment not active, status=' + appointment.status + ')');
-        setWaitingRoom({ callType: video ? 'video' : 'audio' });
-        return;
+        // Appointment time has arrived and is active — proceed with call
+        console.log('[ChatThread] appointment time arrived, proceeding with call');
       }
-      // Appointment time has arrived and is active — proceed with call
-      console.log('[ChatThread] appointment time arrived, proceeding with call');
     } else if (!isDoctor && !appointment) {
       console.warn('[ChatThread] patient has no appointment — call will proceed without waiting room gate');
     }
