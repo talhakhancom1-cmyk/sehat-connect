@@ -187,37 +187,74 @@ const migrateMissingColumns = async () => {
 // slot while preventing double-booking active ones.
 const migrateUniqueConstraints = async () => {
   // Step 1: Clean up duplicate active conversations before creating the unique
-  // index. If duplicate conversations exist for the same appointment_id, close
-  // all but the most recently updated one.
+  // index. If duplicate conversations exist for the same appointment_id:
+  //   a) Pick the most recently updated conversation as the "keeper"
+  //   b) Move all messages from the duplicate(s) into the keeper
+  //   c) Move all call_rooms from the duplicate(s) into the keeper
+  //   d) Close the duplicate(s) so they're no longer active
+  // This preserves all message and call history — no data is lost.
   try {
     const [duplicates] = await sequelize.query(`
-      SELECT appointment_id, count(*) as dup_count
+      SELECT appointment_id
       FROM conversations
       WHERE appointment_id IS NOT NULL AND status = 'active'
       GROUP BY appointment_id
       HAVING count(*) > 1
     `);
     if (duplicates && duplicates.length > 0) {
-      console.log(`[migration] Found ${duplicates.length} appointment(s) with duplicate active conversations — cleaning up...`);
-      // For each duplicate set, keep the most recently updated conversation
-      // and close the rest.
+      console.log(`[migration] Found ${duplicates.length} appointment(s) with duplicate active conversations — merging...`);
       for (const dup of duplicates) {
-        await sequelize.query(`
-          UPDATE conversations SET status = 'closed'
-          WHERE appointment_id = '${dup.appointment_id}'
-            AND status = 'active'
-            AND id NOT IN (
-              SELECT id FROM conversations
-              WHERE appointment_id = '${dup.appointment_id}' AND status = 'active'
-              ORDER BY updated_at DESC
-              LIMIT 1
-            )
+        const apptId = dup.appointment_id;
+        // Find the keeper: most recently updated active conversation for this appointment
+        const [keepers] = await sequelize.query(`
+          SELECT id FROM conversations
+          WHERE appointment_id = '${apptId}' AND status = 'active'
+          ORDER BY updated_at DESC
+          LIMIT 1
         `);
+        if (!keepers || keepers.length === 0) continue;
+        const keeperId = keepers[0].id;
+
+        // Find all duplicate conversation IDs (all active ones except the keeper)
+        const [dupRows] = await sequelize.query(`
+          SELECT id FROM conversations
+          WHERE appointment_id = '${apptId}' AND status = 'active' AND id != '${keeperId}'
+        `);
+        const dupIds = dupRows.map(r => r.id);
+        if (dupIds.length === 0) continue;
+
+        let totalMessagesMoved = 0;
+        let totalCallsMoved = 0;
+        for (const dupId of dupIds) {
+          // Move messages from the duplicate into the keeper
+          const [msgResult] = await sequelize.query(`
+            UPDATE messages SET conversation_id = '${keeperId}'
+            WHERE conversation_id = '${dupId}'
+          `);
+          totalMessagesMoved += msgResult.rowCount || 0;
+
+          // Move call_rooms from the duplicate into the keeper
+          const [callResult] = await sequelize.query(`
+            UPDATE call_rooms SET conversation_id = '${keeperId}'
+            WHERE conversation_id = '${dupId}'
+          `);
+          totalCallsMoved += callResult.rowCount || 0;
+
+          // Close the duplicate conversation (don't delete — preserve the record)
+          await sequelize.query(`
+            UPDATE conversations SET status = 'closed'
+            WHERE id = '${dupId}'
+          `);
+        }
+        console.log(`[migration] Appointment ${apptId}: merged ${totalMessagesMoved} message(s) and ${totalCallsMoved} call(s) into conversation ${keeperId}, closed ${dupIds.length} duplicate(s)`);
       }
-      console.log(`[migration] Duplicate conversations cleaned up — closed ${duplicates.length} duplicate(s)`);
+      console.log(`[migration] Duplicate conversation merge complete`);
+    } else {
+      console.log(`[migration] No duplicate active conversations found — skipping cleanup`);
     }
   } catch (error) {
-    console.log('ℹ️ Duplicate conversation cleanup skipped:', error.message);
+    const fullError = error.parent?.message || error.original?.message || error.message;
+    console.log('ℹ️ Duplicate conversation cleanup skipped:', fullError);
   }
 
   const statements = [
