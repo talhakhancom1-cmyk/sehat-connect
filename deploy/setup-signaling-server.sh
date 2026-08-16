@@ -127,7 +127,7 @@ apt-get update -qq
 
 apt-get install -y -qq curl wget git build-essential software-properties-common \
   nginx ufw certbot python3-certbot-nginx coturn \
-  ca-certificates gnupg 2>&1 | tail -3
+  ca-certificates gnupg postgresql postgresql-contrib 2>&1 | tail -3
 
 ok "System packages installed."
 
@@ -271,18 +271,15 @@ ok "coturn configured (user: $TURN_USERNAME, realm: $TURN_REALM)"
 # ================================================================
 info "Step 6/10: Cloning repository..."
 
-if [ ! -d "$APP_DIR/.git" ]; then
+if [ ! -d "$APP_DIR/.git" ] && [ ! -f "$APP_DIR/backend/server.js" ]; then
   if git clone --depth 1 -b "$BRANCH" "$REPO_URL" "$APP_DIR" 2>/dev/null; then
     ok "Repository cloned."
   else
     fail "Could not clone repository. Check network and repo URL: $REPO_URL"
   fi
 else
-  info "Repository already exists. Pulling latest..."
-  cd "$APP_DIR"
-  git fetch origin
-  git reset --hard "origin/$BRANCH"
-  ok "Repository updated."
+  info "Repository already exists at $APP_DIR. Skipping git fetch (offline deploy)."
+  ok "Repository ready."
 fi
 
 # ================================================================
@@ -297,6 +294,9 @@ cat > .env <<ENVEOF
 # ---- Server ----
 PORT=3000
 NODE_ENV=production
+# Signaling-only mode: only /api/calls, /api/chat, /ws, /internal, /health are mounted.
+# All medical-data routes are absent from the running server.
+SIGNALING_MODE=true
 
 # ---- PostgreSQL (local DB on this server) ----
 DB_HOST=localhost

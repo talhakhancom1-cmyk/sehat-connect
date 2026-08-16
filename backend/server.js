@@ -382,49 +382,72 @@ const seedAdmin = async () => {
   }
 };
 
+// ---- Signaling-only mode ----
+// When SIGNALING_MODE=true, only call/chat/WebSocket/internal/health routes
+// are mounted. All medical-data routes (prescriptions, records, appointments,
+// etc.) are NOT imported and NOT mounted — they're genuinely absent from the
+// running server, not just auth-gated. Used on the dedicated signaling VPS.
+const SIGNALING_MODE = String(process.env.SIGNALING_MODE || '').toLowerCase() === 'true';
+
 // Import routes
-const appointmentRoutes = require('./routes/appointments');
-const doctorRoutes = require('./routes/doctors');
-const medicalRecordRoutes = require('./routes/medicalRecords');
-const userRoutes = require('./routes/users');
-const customFunctionRoutes = require('./routes/customFunctions');
-const authRoutes = require('./routes/auth');
-const timelineRoutes = require('./routes/timeline');
-const { router: recordImportRoutes, patientRouter: recordImportPatientRoutes } = require('./routes/recordImports');
-const prescriptionRoutes = require('./routes/prescriptions');
-const encounterRoutes = require('./routes/encounters');
-const consentRoutes = require('./routes/consents');
-const notificationRoutes = require('./routes/notifications');
-const { router: ipsRoutes, patientRouter: ipsPatientRoutes } = require('./routes/ips');
-const { router: healthCardRoutes, patientRouter: healthCardPatientRoutes } = require('./routes/healthCards');
-const healthCardTokenRoutes = require('./routes/healthCardTokens');
+const internalRoutes = require('./routes/internal');
 const chatRoutes = require('./routes/chat');
 const callRoutes = require('./routes/calls');
-const fileRoutes = require('./routes/files');
-const householdRoutes = require('./routes/households');
-const householdMemberRoutes = require('./routes/householdMembers');
-const delegationRoutes = require('./routes/delegations');
-const paymentRoutes = require('./routes/payments');
-const webhookRoutes = require('./routes/webhooks');
-const auditRoutes = require('./routes/audit');
-const onboardingRoutes = require('./routes/onboarding');
-const scheduleRoutes = require('./routes/schedules');
-const reviewRoutes = require('./routes/reviews');
-const emergencyContactRoutes = require('./routes/emergencyContacts');
-const trackingConfigRoutes = require('./routes/trackingConfig');
-const countryConfigRoutes = require('./routes/countryConfigs');
-const doseEventRoutes = require('./routes/doseEvents');
-const discontinuationRoutes = require('./routes/discontinuations');
-const conversationMemberRoutes = require('./routes/conversationMembers');
-const medicationPlanRoutes = require('./routes/medicationPlans');
-const reminderPreferenceRoutes = require('./routes/reminderPreferences');
-const symptomCheckerRoutes = require('./routes/symptomChecker');
-const encountersListRoutes = require('./routes/encountersList');
 const socketEvents = require('./lib/socketEvents');
-const apiKeyRoutes = require('./routes/apiKeys');
-const emailConfigRoutes = require('./routes/emailConfig');
-const aiConfigRoutes = require('./routes/aiConfig');
-const internalRoutes = require('./routes/internal');
+
+// Full-app routes — only imported/mounted when NOT in signaling mode
+let appointmentRoutes, doctorRoutes, medicalRecordRoutes, userRoutes;
+let customFunctionRoutes, authRoutes, timelineRoutes;
+let recordImportRoutes, recordImportPatientRoutes;
+let prescriptionRoutes, encounterRoutes, consentRoutes, notificationRoutes;
+let ipsRoutes, ipsPatientRoutes, healthCardRoutes, healthCardPatientRoutes;
+let healthCardTokenRoutes, fileRoutes, householdRoutes, householdMemberRoutes;
+let delegationRoutes, paymentRoutes, webhookRoutes, auditRoutes;
+let onboardingRoutes, scheduleRoutes, reviewRoutes, emergencyContactRoutes;
+let trackingConfigRoutes, countryConfigRoutes, doseEventRoutes, discontinuationRoutes;
+let conversationMemberRoutes, medicationPlanRoutes, reminderPreferenceRoutes;
+let symptomCheckerRoutes, encountersListRoutes, apiKeyRoutes, emailConfigRoutes, aiConfigRoutes;
+
+if (!SIGNALING_MODE) {
+  appointmentRoutes = require('./routes/appointments');
+  doctorRoutes = require('./routes/doctors');
+  medicalRecordRoutes = require('./routes/medicalRecords');
+  userRoutes = require('./routes/users');
+  customFunctionRoutes = require('./routes/customFunctions');
+  authRoutes = require('./routes/auth');
+  timelineRoutes = require('./routes/timeline');
+  ({ router: recordImportRoutes, patientRouter: recordImportPatientRoutes } = require('./routes/recordImports'));
+  prescriptionRoutes = require('./routes/prescriptions');
+  encounterRoutes = require('./routes/encounters');
+  consentRoutes = require('./routes/consents');
+  notificationRoutes = require('./routes/notifications');
+  ({ router: ipsRoutes, patientRouter: ipsPatientRoutes } = require('./routes/ips'));
+  ({ router: healthCardRoutes, patientRouter: healthCardPatientRoutes } = require('./routes/healthCards'));
+  healthCardTokenRoutes = require('./routes/healthCardTokens');
+  fileRoutes = require('./routes/files');
+  householdRoutes = require('./routes/households');
+  householdMemberRoutes = require('./routes/householdMembers');
+  delegationRoutes = require('./routes/delegations');
+  paymentRoutes = require('./routes/payments');
+  webhookRoutes = require('./routes/webhooks');
+  auditRoutes = require('./routes/audit');
+  onboardingRoutes = require('./routes/onboarding');
+  scheduleRoutes = require('./routes/schedules');
+  reviewRoutes = require('./routes/reviews');
+  emergencyContactRoutes = require('./routes/emergencyContacts');
+  trackingConfigRoutes = require('./routes/trackingConfig');
+  countryConfigRoutes = require('./routes/countryConfigs');
+  doseEventRoutes = require('./routes/doseEvents');
+  discontinuationRoutes = require('./routes/discontinuations');
+  conversationMemberRoutes = require('./routes/conversationMembers');
+  medicationPlanRoutes = require('./routes/medicationPlans');
+  reminderPreferenceRoutes = require('./routes/reminderPreferences');
+  symptomCheckerRoutes = require('./routes/symptomChecker');
+  encountersListRoutes = require('./routes/encountersList');
+  apiKeyRoutes = require('./routes/apiKeys');
+  emailConfigRoutes = require('./routes/emailConfig');
+  aiConfigRoutes = require('./routes/aiConfig');
+}
 
 // Use routes
 app.use(generalLimiter); // Apply general rate limiting to all API routes
@@ -433,130 +456,146 @@ app.use(generalLimiter); // Apply general rate limiting to all API routes
 // Mounted before /api routes so it's not affected by API rate limiting.
 app.use('/internal', internalRoutes);
 
-// Public endpoint — returns only whether signup OTP is enabled (no auth needed)
-// Used by the Register page to decide whether to show the OTP step.
-app.get('/api/email-config/public-flags', async (req, res) => {
-  try {
-    const { EmailConfig } = require('./models');
-    const config = await EmailConfig.findOne({
-      where: { is_active: true },
-      order: [['updated_at', 'DESC']],
-    });
-    res.json({
-      configured: !!config,
-      enable_signup_otp: config?.enable_signup_otp || false,
-    });
-  } catch (e) {
-    res.json({ configured: false, enable_signup_otp: false });
-  }
-});
-app.get('/api/v1/email-config/public-flags', async (req, res) => {
-  try {
-    const { EmailConfig } = require('./models');
-    const config = await EmailConfig.findOne({
-      where: { is_active: true },
-      order: [['updated_at', 'DESC']],
-    });
-    res.json({
-      configured: !!config,
-      enable_signup_otp: config?.enable_signup_otp || false,
-    });
-  } catch (e) {
-    res.json({ configured: false, enable_signup_otp: false });
-  }
-});
+// ---- Route mounting ----
+// In SIGNALING_MODE, only chat + calls + internal + health are mounted.
+// All medical-data routes are genuinely absent (not imported, not mounted).
 
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/doctors', doctorRoutes);
-app.use('/api/medical-records', medicalRecordRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/functions', customFunctionRoutes);
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/patients/:patientId/timeline', timelineRoutes);
-app.use('/api/record-imports', recordImportRoutes);
-app.use('/api/patients/:patientId/record-imports', recordImportPatientRoutes);
-app.use('/api/prescriptions', prescriptionRoutes);
-app.use('/api/appointments/:appointmentId/encounter', encounterRoutes);
-app.use('/api/consents', consentRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/patients/:patientId/ips', ipsPatientRoutes);
-app.use('/api/ips', ipsRoutes);
-app.use('/api/patients/:patientId/health-cards', healthCardPatientRoutes);
-app.use('/api/health-cards', healthCardRoutes);
-app.use('/api/health-card-tokens', healthCardTokenRoutes);
-app.use('/api', chatRoutes);
-app.use('/api/calls', callRoutes);
-app.use('/api/files', fileRoutes);
-app.use('/api/households', householdRoutes);
-app.use('/api/household-members', householdMemberRoutes);
-app.use('/api/delegations', delegationRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/onboarding', onboardingRoutes);
-app.use('/api/schedules', scheduleRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/emergency-contacts', emergencyContactRoutes);
-app.use('/api/tracking-config', trackingConfigRoutes);
-app.use('/api/country-configs', countryConfigRoutes);
-app.use('/api/dose-events', doseEventRoutes);
-app.use('/api/discontinuations', discontinuationRoutes);
-app.use('/api/conversation-members', conversationMemberRoutes);
-app.use('/api/medication-plans', medicationPlanRoutes);
-app.use('/api/reminder-preferences', reminderPreferenceRoutes);
-app.use('/api/symptom-checker', symptomCheckerRoutes);
-app.use('/api/encounters', encountersListRoutes);
-app.use('/api/audit-events', auditRoutes);
-socketEvents.attachPlaceholder(app);
-app.use('/api/api-keys', apiKeyRoutes);
-app.use('/api/email-config', emailConfigRoutes);
-app.use('/api/ai-config', aiConfigRoutes);
+if (SIGNALING_MODE) {
+  // Signaling-only routes
+  app.use('/api', chatRoutes);
+  app.use('/api/calls', callRoutes);
+  app.use('/api/v1', chatRoutes);
+  app.use('/api/v1/calls', callRoutes);
+  socketEvents.attachPlaceholder(app);
+  console.log('[SIGNALING_MODE] Signaling-only routes mounted: /api/chat, /api/calls, /ws, /internal, /health');
+} else {
+  // Full app routes
 
-// Versioned v1 API surface (canonical per Section 10)
-app.use('/api/v1/appointments', appointmentRoutes);
-app.use('/api/v1/doctors', doctorRoutes);
-app.use('/api/v1/medical-records', medicalRecordRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/functions', customFunctionRoutes);
-app.use('/api/v1/auth', authLimiter, authRoutes);
-app.use('/api/v1/patients/:patientId/timeline', timelineRoutes);
-app.use('/api/v1/record-imports', recordImportRoutes);
-app.use('/api/v1/patients/:patientId/record-imports', recordImportPatientRoutes);
-app.use('/api/v1/prescriptions', prescriptionRoutes);
-app.use('/api/v1/appointments/:appointmentId/encounter', encounterRoutes);
-app.use('/api/v1/consents', consentRoutes);
-app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/patients/:patientId/ips', ipsPatientRoutes);
-app.use('/api/v1/ips', ipsRoutes);
-app.use('/api/v1/patients/:patientId/health-cards', healthCardPatientRoutes);
-app.use('/api/v1/health-cards', healthCardRoutes);
-app.use('/api/v1/health-card-tokens', healthCardTokenRoutes);
-app.use('/api/v1', chatRoutes);
-app.use('/api/v1/calls', callRoutes);
-app.use('/api/v1/files', fileRoutes);
-app.use('/api/v1/households', householdRoutes);
-app.use('/api/v1/household-members', householdMemberRoutes);
-app.use('/api/v1/delegations', delegationRoutes);
-app.use('/api/v1/payments', paymentRoutes);
-app.use('/api/v1/webhooks', webhookRoutes);
-app.use('/api/v1/audit', auditRoutes);
-app.use('/api/v1/onboarding', onboardingRoutes);
-app.use('/api/v1/schedules', scheduleRoutes);
-app.use('/api/v1/reviews', reviewRoutes);
-app.use('/api/v1/emergency-contacts', emergencyContactRoutes);
-app.use('/api/v1/tracking-config', trackingConfigRoutes);
-app.use('/api/v1/country-configs', countryConfigRoutes);
-app.use('/api/v1/dose-events', doseEventRoutes);
-app.use('/api/v1/discontinuations', discontinuationRoutes);
-app.use('/api/v1/conversation-members', conversationMemberRoutes);
-app.use('/api/v1/medication-plans', medicationPlanRoutes);
-app.use('/api/v1/reminder-preferences', reminderPreferenceRoutes);
-app.use('/api/v1/symptom-checker', symptomCheckerRoutes);
-app.use('/api/v1/encounters', encountersListRoutes);
-app.use('/api/v1/audit-events', auditRoutes);
-app.use('/api/v1/api-keys', apiKeyRoutes);
-app.use('/api/v1/email-config', emailConfigRoutes);
-app.use('/api/v1/ai-config', aiConfigRoutes);
+  // Public endpoint — returns only whether signup OTP is enabled (no auth needed)
+  // Used by the Register page to decide whether to show the OTP step.
+  app.get('/api/email-config/public-flags', async (req, res) => {
+    try {
+      const { EmailConfig } = require('./models');
+      const config = await EmailConfig.findOne({
+        where: { is_active: true },
+        order: [['updated_at', 'DESC']],
+      });
+      res.json({
+        configured: !!config,
+        enable_signup_otp: config?.enable_signup_otp || false,
+      });
+    } catch (e) {
+      res.json({ configured: false, enable_signup_otp: false });
+    }
+  });
+  app.get('/api/v1/email-config/public-flags', async (req, res) => {
+    try {
+      const { EmailConfig } = require('./models');
+      const config = await EmailConfig.findOne({
+        where: { is_active: true },
+        order: [['updated_at', 'DESC']],
+      });
+      res.json({
+        configured: !!config,
+        enable_signup_otp: config?.enable_signup_otp || false,
+      });
+    } catch (e) {
+      res.json({ configured: false, enable_signup_otp: false });
+    }
+  });
+
+  app.use('/api/appointments', appointmentRoutes);
+  app.use('/api/doctors', doctorRoutes);
+  app.use('/api/medical-records', medicalRecordRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/functions', customFunctionRoutes);
+  app.use('/api/auth', authLimiter, authRoutes);
+  app.use('/api/patients/:patientId/timeline', timelineRoutes);
+  app.use('/api/record-imports', recordImportRoutes);
+  app.use('/api/patients/:patientId/record-imports', recordImportPatientRoutes);
+  app.use('/api/prescriptions', prescriptionRoutes);
+  app.use('/api/appointments/:appointmentId/encounter', encounterRoutes);
+  app.use('/api/consents', consentRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/patients/:patientId/ips', ipsPatientRoutes);
+  app.use('/api/ips', ipsRoutes);
+  app.use('/api/patients/:patientId/health-cards', healthCardPatientRoutes);
+  app.use('/api/health-cards', healthCardRoutes);
+  app.use('/api/health-card-tokens', healthCardTokenRoutes);
+  app.use('/api', chatRoutes);
+  app.use('/api/calls', callRoutes);
+  app.use('/api/files', fileRoutes);
+  app.use('/api/households', householdRoutes);
+  app.use('/api/household-members', householdMemberRoutes);
+  app.use('/api/delegations', delegationRoutes);
+  app.use('/api/payments', paymentRoutes);
+  app.use('/api/webhooks', webhookRoutes);
+  app.use('/api/audit', auditRoutes);
+  app.use('/api/onboarding', onboardingRoutes);
+  app.use('/api/schedules', scheduleRoutes);
+  app.use('/api/reviews', reviewRoutes);
+  app.use('/api/emergency-contacts', emergencyContactRoutes);
+  app.use('/api/tracking-config', trackingConfigRoutes);
+  app.use('/api/country-configs', countryConfigRoutes);
+  app.use('/api/dose-events', doseEventRoutes);
+  app.use('/api/discontinuations', discontinuationRoutes);
+  app.use('/api/conversation-members', conversationMemberRoutes);
+  app.use('/api/medication-plans', medicationPlanRoutes);
+  app.use('/api/reminder-preferences', reminderPreferenceRoutes);
+  app.use('/api/symptom-checker', symptomCheckerRoutes);
+  app.use('/api/encounters', encountersListRoutes);
+  app.use('/api/audit-events', auditRoutes);
+  socketEvents.attachPlaceholder(app);
+  app.use('/api/api-keys', apiKeyRoutes);
+  app.use('/api/email-config', emailConfigRoutes);
+  app.use('/api/ai-config', aiConfigRoutes);
+
+  // Versioned v1 API surface (canonical per Section 10)
+  app.use('/api/v1/appointments', appointmentRoutes);
+  app.use('/api/v1/doctors', doctorRoutes);
+  app.use('/api/v1/medical-records', medicalRecordRoutes);
+  app.use('/api/v1/users', userRoutes);
+  app.use('/api/v1/functions', customFunctionRoutes);
+  app.use('/api/v1/auth', authLimiter, authRoutes);
+  app.use('/api/v1/patients/:patientId/timeline', timelineRoutes);
+  app.use('/api/v1/record-imports', recordImportRoutes);
+  app.use('/api/v1/patients/:patientId/record-imports', recordImportPatientRoutes);
+  app.use('/api/v1/prescriptions', prescriptionRoutes);
+  app.use('/api/v1/appointments/:appointmentId/encounter', encounterRoutes);
+  app.use('/api/v1/consents', consentRoutes);
+  app.use('/api/v1/notifications', notificationRoutes);
+  app.use('/api/v1/patients/:patientId/ips', ipsPatientRoutes);
+  app.use('/api/v1/ips', ipsRoutes);
+  app.use('/api/v1/patients/:patientId/health-cards', healthCardPatientRoutes);
+  app.use('/api/v1/health-cards', healthCardRoutes);
+  app.use('/api/v1/health-card-tokens', healthCardTokenRoutes);
+  app.use('/api/v1', chatRoutes);
+  app.use('/api/v1/calls', callRoutes);
+  app.use('/api/v1/files', fileRoutes);
+  app.use('/api/v1/households', householdRoutes);
+  app.use('/api/v1/household-members', householdMemberRoutes);
+  app.use('/api/v1/delegations', delegationRoutes);
+  app.use('/api/v1/payments', paymentRoutes);
+  app.use('/api/v1/webhooks', webhookRoutes);
+  app.use('/api/v1/audit', auditRoutes);
+  app.use('/api/v1/onboarding', onboardingRoutes);
+  app.use('/api/v1/schedules', scheduleRoutes);
+  app.use('/api/v1/reviews', reviewRoutes);
+  app.use('/api/v1/emergency-contacts', emergencyContactRoutes);
+  app.use('/api/v1/tracking-config', trackingConfigRoutes);
+  app.use('/api/v1/country-configs', countryConfigRoutes);
+  app.use('/api/v1/dose-events', doseEventRoutes);
+  app.use('/api/v1/discontinuations', discontinuationRoutes);
+  app.use('/api/v1/conversation-members', conversationMemberRoutes);
+  app.use('/api/v1/medication-plans', medicationPlanRoutes);
+  app.use('/api/v1/reminder-preferences', reminderPreferenceRoutes);
+  app.use('/api/v1/symptom-checker', symptomCheckerRoutes);
+  app.use('/api/v1/encounters', encountersListRoutes);
+  app.use('/api/v1/audit-events', auditRoutes);
+  app.use('/api/v1/api-keys', apiKeyRoutes);
+  app.use('/api/v1/email-config', emailConfigRoutes);
+  app.use('/api/v1/ai-config', aiConfigRoutes);
+}
 
 // Health check endpoint
 const healthHandler = async (req, res) => {
@@ -602,14 +641,23 @@ app.set('broadcasters', broadcasters);
 
 const start = async () => {
   await initializeDatabase();
-  await normalizeLegacyRoles();
-  await seedAdmin();
+  if (SIGNALING_MODE) {
+    console.log('[SIGNALING_MODE] Skipping admin seed, role normalization, and scheduler');
+  } else {
+    await normalizeLegacyRoles();
+    await seedAdmin();
+  }
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`WebSocket server attached at /ws`);
+    if (SIGNALING_MODE) {
+      console.log('[SIGNALING_MODE] Running in signaling-only mode — medical-data routes are NOT mounted');
+    }
   });
-  // Start background job scheduler (reminders, expiry, cleanup)
-  startScheduler(io);
+  // Start background job scheduler (reminders, expiry, cleanup) — not needed in signaling mode
+  if (!SIGNALING_MODE) {
+    startScheduler(io);
+  }
 };
 start();
 
