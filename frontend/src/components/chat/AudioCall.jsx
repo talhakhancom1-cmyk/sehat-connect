@@ -42,8 +42,6 @@ export default function AudioCall({ callId, role, remoteUserId, _displayName, ot
     const el = remoteAudioRef.current;
     if (!el || !remoteStream) return;
     el.srcObject = remoteStream;
-    // Apply the selected audio output device.
-    audioOutput.applyToElement(el);
 
     const audioTracks = remoteStream.getAudioTracks();
     console.log('[AudioCall] remoteStream attached', {
@@ -62,7 +60,16 @@ export default function AudioCall({ callId, role, remoteUserId, _displayName, ot
       document.addEventListener('click', resume, { once: true });
       document.addEventListener('touchstart', resume, { once: true });
     });
-  }, [remoteStream, audioOutput]);
+  }, [remoteStream]);
+
+  // Apply audio output device to the remote audio element.
+  // Separate effect so changing the device doesn't re-attach the stream
+  // (which would reset the sinkId to default).
+  useEffect(() => {
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    audioOutput.applyToElement(el);
+  }, [audioOutput.selectedDeviceId, audioOutput.supported, audioOutput.applyToElement]);
 
   // Call timer — starts when connected.
   useEffect(() => {

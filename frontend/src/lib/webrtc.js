@@ -210,13 +210,26 @@ export class WebRTCCall {
     const facingMode = videoTrack.getSettings().facingMode;
     const newFacing = facingMode === 'user' ? 'environment' : 'user';
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: newFacing },
-        audio: false,
-      });
+      // Try the requested facingMode first. On desktop there may be no
+      // "environment" camera, so fall back to any available video device.
+      let newStream;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: newFacing },
+          audio: false,
+        });
+      } catch {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
       const newTrack = newStream.getVideoTracks()[0];
       if (!newTrack) return false;
-      // Replace the track in the peer connection.
+      // Replace the track in the peer connection WITHOUT tearing it down.
+      // replaceTrack() is the correct API — it swaps the media source while
+      // keeping the same RTP sender and SSRC, so the remote peer just sees
+      // a video source change with no connection interruption.
       const sender = this.pc?.getSenders().find((s) => s.track && s.track.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newTrack);
@@ -227,7 +240,10 @@ export class WebRTCCall {
       this.localStream.addTrack(newTrack);
       return newFacing;
     } catch (e) {
-      this.onError?.(e);
+      // Camera switch failure is NOT a call-ending error — the peer
+      // connection is still alive. Just log and return false so the UI
+      // can show a non-intrusive message without dropping the call.
+      console.warn('[WebRTC:pc] switchCamera failed (non-fatal):', e.message);
       return false;
     }
   }

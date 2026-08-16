@@ -28,6 +28,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export function useAudioOutput() {
   const [outputDevices, setOutputDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [sinkError, setSinkError] = useState(null);
   const [supported] = useState(
     typeof HTMLMediaElement !== 'undefined' &&
       typeof HTMLMediaElement.prototype.setSinkId === 'function'
@@ -100,9 +101,10 @@ export function useAudioOutput() {
       if (!supported || !selectedDeviceId) return;
       try {
         await el.setSinkId(selectedDeviceId);
+        setSinkError(null);
       } catch (e) {
-        // AbortError or NotFoundError — non-fatal, OS routing applies.
-        console.warn('[useAudioOutput] setSinkId failed:', e.message);
+        console.warn('[useAudioOutput] setSinkId failed:', e.name, e.message);
+        setSinkError(e.name === 'NotFoundError' ? 'Selected audio device not found' : e.message);
       }
     },
     [supported, selectedDeviceId]
@@ -112,8 +114,14 @@ export function useAudioOutput() {
   const selectDevice = useCallback(
     (id) => {
       setSelectedDeviceId(id);
+      setSinkError(null);
       if (lastElementRef.current && supported) {
-        lastElementRef.current.setSinkId(id).catch(() => {});
+        lastElementRef.current.setSinkId(id).then(() => {
+          setSinkError(null);
+        }).catch((e) => {
+          console.warn('[useAudioOutput] setSinkId failed on select:', e.name, e.message);
+          setSinkError(e.name === 'NotFoundError' ? 'Selected audio device not found' : e.message);
+        });
       }
     },
     [supported]
@@ -125,6 +133,7 @@ export function useAudioOutput() {
     selectDevice,
     applyToElement,
     supported,
+    sinkError,
     deviceLabel,
     deviceIcon,
   };

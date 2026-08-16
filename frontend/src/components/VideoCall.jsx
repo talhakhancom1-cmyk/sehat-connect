@@ -21,6 +21,7 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
   const [controlsVisible, setControlsVisible] = useState(true);
   const [pipPos, setPipPos] = useState({ x: null, y: null }); // null = default bottom-right
   const [remoteReady, setRemoteReady] = useState(false);
+  const [cameraSwitchMsg, setCameraSwitchMsg] = useState(null);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -46,7 +47,7 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
     }
   }, [localStream]);
 
-  // Attach remote stream + apply audio output device.
+  // Attach remote stream to the video element (only when stream changes).
   useEffect(() => {
     const el = remoteVideoRef.current;
     if (!el || !remoteStream) return;
@@ -61,9 +62,6 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
       audioTracks: audioTracks.map((t) => ({ id: t.id, enabled: t.enabled, muted: t.muted, readyState: t.readyState })),
     });
 
-    // Apply the selected audio output device to the remote video element.
-    audioOutput.applyToElement(el);
-
     el.play().then(() => {
       console.log('[VideoCall] remote video+audio playing');
     }).catch((err) => {
@@ -76,7 +74,16 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
       document.addEventListener('click', resume, { once: true });
       document.addEventListener('touchstart', resume, { once: true });
     });
-  }, [remoteStream, audioOutput]);
+  }, [remoteStream]);
+
+  // Apply audio output device to the remote video element.
+  // Separate effect so changing the device doesn't re-attach the stream
+  // (which would reset the sinkId to default).
+  useEffect(() => {
+    const el = remoteVideoRef.current;
+    if (!el) return;
+    audioOutput.applyToElement(el);
+  }, [audioOutput.selectedDeviceId, audioOutput.supported, audioOutput.applyToElement]);
 
   // Call timer — starts when connected.
   useEffect(() => {
@@ -276,6 +283,13 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
         </div>
       )}
 
+      {/* Camera switch feedback toast */}
+      {cameraSwitchMsg && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-black/70 text-white text-sm backdrop-blur-sm">
+          {cameraSwitchMsg}
+        </div>
+      )}
+
       {/* In-call controls (auto-hide) */}
       {status === 'connected' && (
         <div className={`absolute bottom-0 left-0 right-0 z-20 p-4 sm:p-6 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-3 sm:gap-4 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -294,7 +308,13 @@ export default function VideoCall({ callId, role, remoteUserId, _displayName, do
             {cameraOn ? <Video className="w-5 h-5 sm:w-6 sm:h-6" /> : <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />}
           </button>
           <button
-            onClick={switchCamera}
+            onClick={async () => {
+              const result = await switchCamera();
+              if (!result) {
+                setCameraSwitchMsg('No other camera available');
+                setTimeout(() => setCameraSwitchMsg(null), 2500);
+              }
+            }}
             className="p-3.5 sm:p-4 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all active:scale-95"
             title="Switch camera"
           >
