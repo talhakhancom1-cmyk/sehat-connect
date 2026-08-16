@@ -3,7 +3,7 @@ import { Bell, Search, Siren, LogOut, Home, Stethoscope, LayoutGrid, MessageCirc
 import MobileNav from '@/components/MobileNav';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-import { isAdmin, isDoctor } from '@/lib/useRole';
+import { isAdmin, isDoctor, useRole } from '@/lib/useRole';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn, authFileUrl } from '@/lib/utils';
 import { listNotifications, markRead, markAllRead, deepLinkFor, iconFor } from '@/lib/notifications';
@@ -72,7 +72,7 @@ export default function TopBar() {
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const name = user?.display_name?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'there';
   const initial = (user?.display_name || user?.full_name || user?.email || 'U')[0].toUpperCase();
-  const role = location.pathname.startsWith('/doctor') ? 'doctor' : location.pathname.startsWith('/admin') ? 'admin' : 'patient';
+  const { role } = useRole();
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-border safe-area-top">
@@ -108,23 +108,23 @@ export default function TopBar() {
               <DropdownMenuLabel className="text-xs text-muted-foreground">Switch Portal</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => navigate('/')}
-                className={cn('cursor-pointer', location.pathname === '/' && 'bg-primary/10 text-primary')}>
-                
+                className={cn('cursor-pointer', role === 'patient' && 'bg-primary/10 text-primary')}>
+
                 <Home className="w-4 h-4 mr-2" /> Patient Portal
               </DropdownMenuItem>
               {isDoctor(user?.role, user?.app_role) &&
               <DropdownMenuItem
                 onClick={() => navigate('/doctor')}
-                className={cn('cursor-pointer', location.pathname.startsWith('/doctor') && 'bg-primary/10 text-primary')}>
-                
+                className={cn('cursor-pointer', role === 'doctor' && 'bg-primary/10 text-primary')}>
+
                   <Stethoscope className="w-4 h-4 mr-2" /> Doctor Portal
                 </DropdownMenuItem>
               }
               {isAdmin(user?.role) &&
               <DropdownMenuItem
                 onClick={() => navigate('/admin')}
-                className={cn('cursor-pointer', location.pathname.startsWith('/admin') && 'bg-primary/10 text-primary')}>
-                
+                className={cn('cursor-pointer', role === 'admin' && 'bg-primary/10 text-primary')}>
+
                   <LayoutGrid className="w-4 h-4 mr-2" /> Admin Portal
                 </DropdownMenuItem>
               }

@@ -25,9 +25,9 @@ export default function MobileNav({ role = 'patient' }) {
   const initial = (user?.display_name || user?.full_name || user?.email || 'U')[0].toUpperCase();
 
   const portals = [
-    { path: '/', icon: Home, label: 'Patient', show: true },
-    { path: '/doctor', icon: Stethoscope, label: 'Doctor', show: isDoctor(user?.role, user?.app_role) },
-    { path: '/admin', icon: LayoutGrid, label: 'Admin', show: isAdmin(user?.role) },
+    { path: '/', icon: Home, label: 'Patient', show: true, key: 'patient' },
+    { path: '/doctor', icon: Stethoscope, label: 'Doctor', show: isDoctor(user?.role, user?.app_role), key: 'doctor' },
+    { path: '/admin', icon: LayoutGrid, label: 'Admin', show: isAdmin(user?.role), key: 'admin' },
   ].filter(p => p.show);
 
   const quickLinks = [
@@ -145,7 +145,7 @@ export default function MobileNav({ role = 'patient' }) {
               <div className="flex p-1 mt-3 mb-2 rounded-xl bg-black/[0.05]">
                 {portals.map((p) => {
                   const Icon = p.icon;
-                  const active = location.pathname.startsWith(p.path);
+                  const active = role === p.key;
                   return (
                     <button
                       key={p.path}
