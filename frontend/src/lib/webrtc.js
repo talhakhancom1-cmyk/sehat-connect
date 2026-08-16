@@ -210,20 +210,32 @@ export class WebRTCCall {
     if (!videoTrack) return false;
 
     const currentLabel = videoTrack.label;
-    const newFacing = this.currentFacingMode === 'user' ? 'environment' : 'user';
-    console.log('[WebRTC:pc] switchCamera: current =', this.currentFacingMode, '(' + currentLabel + ') → target =', newFacing);
+    const oldFacing = this.currentFacingMode;
+    const newFacing = oldFacing === 'user' ? 'environment' : 'user';
+    console.log('[WebRTC:pc] switchCamera: current =', oldFacing, '(' + currentLabel + ') → target =', newFacing);
+
+    // CRITICAL: On both Android Chrome and iOS Safari, you cannot acquire a
+    // second camera while the first one is still capturing. We MUST stop the
+    // current video track first, then acquire the other camera. This causes a
+    // brief blank flash (~200ms) but is the only reliable way to switch cameras
+    // on mobile. If the new camera fails to acquire, we roll back to the
+    // original facing mode.
+    const sender = this.pc?.getSenders().find((s) => s.track && s.track.kind === 'video');
+
+    // Stop the current camera to free the capture session
+    console.log('[WebRTC:pc] switchCamera: stopping current camera track to free capture session');
+    videoTrack.stop();
+    this.localStream.removeTrack(videoTrack);
 
     try {
       let newStream = null;
       let usedStrategy = '';
 
-      // ---- Strategy 1: facingMode constraint (works on iOS Safari) ----
-      // iOS Safari often only exposes ONE videoinput device in enumerateDevices(),
-      // but it DOES respect facingMode constraints to switch between front/back.
-      // We track currentFacingMode ourselves since getSettings().facingMode is
-      // unreliable on iOS.
+      // ---- Strategy 1: facingMode constraint ----
+      // Works on both iOS Safari and Android Chrome. Now that the old camera
+      // is stopped, the browser can actually acquire the other camera.
       try {
-        console.log('[WebRTC:pc] switchCamera: trying facingMode =', newFacing);
+        console.log('[WebRTC:pc] switchCamera: trying facingMode =', newFacing, '(exact)');
         newStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { exact: newFacing } },
           audio: false,
@@ -242,9 +254,9 @@ export class WebRTCCall {
         }
       }
 
-      // ---- Strategy 2: enumerateDevices + deviceId (works on Android Chrome) ----
-      // Android Chrome exposes multiple videoinput devices with distinct deviceIds.
-      // This is the fallback when facingMode constraints don't work.
+      // ---- Strategy 2: enumerateDevices + deviceId ----
+      // Fallback for browsers that expose multiple devices but don't respect
+      // facingMode constraints well.
       if (!newStream) {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoInputs = devices.filter(d => d.kind === 'videoinput');
@@ -252,10 +264,8 @@ export class WebRTCCall {
           videoInputs.map(d => `"${d.label || 'unlabeled'}"`));
 
         if (videoInputs.length >= 2) {
-          // Find a camera that's NOT the current one by label
           let targetDevice = videoInputs.find(d => d.label && d.label !== currentLabel);
           if (!targetDevice) {
-            // Labels might be empty — alternate by index
             const currentIndex = videoInputs.findIndex(d => d.label === currentLabel);
             const nextIndex = (currentIndex + 1) % videoInputs.length;
             targetDevice = videoInputs[nextIndex];
@@ -277,50 +287,69 @@ export class WebRTCCall {
               usedStrategy = 'deviceId-loose';
             }
           }
-        } else {
-          console.warn('[WebRTC:pc] switchCamera: only', videoInputs.length, 'video device(s) in enumerateDevices');
         }
       }
 
+      // ---- All strategies failed — ROLLBACK to original camera ----
       if (!newStream) {
-        console.warn('[WebRTC:pc] switchCamera: all strategies failed, no camera switch possible');
+        console.warn('[WebRTC:pc] switchCamera: all strategies failed, rolling back to', oldFacing);
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: oldFacing },
+          audio: false,
+        });
+        const rollbackTrack = newStream.getVideoTracks()[0];
+        if (rollbackTrack && sender) {
+          await sender.replaceTrack(rollbackTrack);
+        }
+        this.localStream.addTrack(rollbackTrack);
+        console.log('[WebRTC:pc] switchCamera: rolled back to original camera');
         return false;
       }
 
       const newTrack = newStream.getVideoTracks()[0];
       if (!newTrack) {
-        console.warn('[WebRTC:pc] switchCamera: no video track in new stream');
-        return false;
-      }
-
-      // Check if we got the same physical camera by comparing labels.
-      // getUserMedia creates a new track object each time, so track.id is useless.
-      if (newTrack.label && currentLabel && newTrack.label === currentLabel) {
-        console.warn('[WebRTC:pc] switchCamera: got the same camera back (label match):', newTrack.label);
-        newTrack.stop();
+        console.warn('[WebRTC:pc] switchCamera: no video track in new stream, rolling back');
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: oldFacing },
+          audio: false,
+        });
+        const rollbackTrack = newStream.getVideoTracks()[0];
+        if (rollbackTrack && sender) {
+          await sender.replaceTrack(rollbackTrack);
+        }
+        this.localStream.addTrack(rollbackTrack);
         return false;
       }
 
       console.log('[WebRTC:pc] switchCamera: new camera =', newTrack.label, 'via', usedStrategy);
 
       // Replace the track in the peer connection WITHOUT tearing it down.
-      const sender = this.pc?.getSenders().find((s) => s.track && s.track.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newTrack);
         console.log('[WebRTC:pc] switchCamera: replaceTrack succeeded');
       } else {
         console.warn('[WebRTC:pc] switchCamera: no video sender found in peer connection');
       }
-      // Stop the old track and update the local stream.
-      videoTrack.stop();
-      this.localStream.removeTrack(videoTrack);
       this.localStream.addTrack(newTrack);
-      // Update our tracked facing mode
       this.currentFacingMode = newFacing;
       console.log('[WebRTC:pc] switchCamera: SUCCESS — switched to', newTrack.label, 'facing =', newFacing);
       return newFacing;
     } catch (e) {
-      console.warn('[WebRTC:pc] switchCamera failed (non-fatal):', e.message);
+      // Last resort: try to restore the original camera
+      console.warn('[WebRTC:pc] switchCamera failed, attempting rollback:', e.message);
+      try {
+        const rollbackStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: oldFacing },
+          audio: false,
+        });
+        const rollbackTrack = rollbackStream.getVideoTracks()[0];
+        if (rollbackTrack && sender) {
+          await sender.replaceTrack(rollbackTrack);
+        }
+        this.localStream.addTrack(rollbackTrack);
+      } catch (rollbackErr) {
+        console.error('[WebRTC:pc] switchCamera: ROLLBACK ALSO FAILED:', rollbackErr.message);
+      }
       return false;
     }
   }
