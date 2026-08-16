@@ -207,25 +207,85 @@ export class WebRTCCall {
     if (!this.localStream) return false;
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (!videoTrack) return false;
-    const facingMode = videoTrack.getSettings().facingMode;
-    const newFacing = facingMode === 'user' ? 'environment' : 'user';
+    const settings = videoTrack.getSettings();
+    const facingMode = settings.facingMode;
+    console.log('[WebRTC:pc] switchCamera: current facingMode =', facingMode, 'label =', videoTrack.label);
+
+    // facingMode is often undefined on iOS Safari. If we can't determine
+    // the current facing, enumerate devices and pick a different camera.
+    let newFacing = facingMode === 'user' ? 'environment' : 'user';
+
     try {
-      // Try the requested facingMode first. On desktop there may be no
-      // "environment" camera, so fall back to any available video device.
-      let newStream;
+      let newStream = null;
+
+      // Attempt 1: Try the opposite facingMode
       try {
+        console.log('[WebRTC:pc] switchCamera: trying facingMode =', newFacing);
         newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: newFacing },
+          video: { facingMode: { exact: newFacing } },
           audio: false,
         });
-      } catch {
+      } catch (e1) {
+        console.log('[WebRTC:pc] switchCamera: exact facingMode failed:', e1.message);
+
+        // Attempt 2: Try with facingMode (non-exact)
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: newFacing },
+            audio: false,
+          });
+        } catch (e2) {
+          console.log('[WebRTC:pc] switchCamera: non-exact facingMode failed:', e2.message);
+
+          // Attempt 3: Enumerate devices and pick a different camera by deviceId
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = devices.filter(d => d.kind === 'videoinput');
+          console.log('[WebRTC:pc] switchCamera: found', videoInputs.length, 'video devices:',
+            videoInputs.map(d => d.label || 'unlabeled'));
+
+          // Find a camera that's NOT the current one
+          const otherCameras = videoInputs.filter(d => d.label && d.label !== videoTrack.label);
+          if (otherCameras.length > 0) {
+            console.log('[WebRTC:pc] switchCamera: trying deviceId =', otherCameras[0].label);
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: { exact: otherCameras[0].deviceId } },
+              audio: false,
+            });
+          } else if (videoInputs.length > 1) {
+            // Labels might be empty (pre-permission). Try the second device.
+            console.log('[WebRTC:pc] switchCamera: trying second device by index');
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: { exact: videoInputs[1].deviceId } },
+              audio: false,
+            });
+          }
+        }
+      }
+
+      if (!newStream) {
+        // Last resort: just any video device
+        console.log('[WebRTC:pc] switchCamera: falling back to any video device');
         newStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
         });
       }
+
       const newTrack = newStream.getVideoTracks()[0];
-      if (!newTrack) return false;
+      if (!newTrack) {
+        console.warn('[WebRTC:pc] switchCamera: no video track in new stream');
+        return false;
+      }
+
+      // If we got the same track (same camera), give up
+      if (newTrack.id === videoTrack.id) {
+        console.warn('[WebRTC:pc] switchCamera: got the same camera back, no switch possible');
+        newTrack.stop();
+        return false;
+      }
+
+      console.log('[WebRTC:pc] switchCamera: new track =', newTrack.label, 'facingMode =', newTrack.getSettings().facingMode);
+
       // Replace the track in the peer connection WITHOUT tearing it down.
       // replaceTrack() is the correct API — it swaps the media source while
       // keeping the same RTP sender and SSRC, so the remote peer just sees
@@ -233,12 +293,17 @@ export class WebRTCCall {
       const sender = this.pc?.getSenders().find((s) => s.track && s.track.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newTrack);
+        console.log('[WebRTC:pc] switchCamera: replaceTrack succeeded');
+      } else {
+        console.warn('[WebRTC:pc] switchCamera: no video sender found in peer connection');
       }
       // Stop the old track and update the local stream.
       videoTrack.stop();
       this.localStream.removeTrack(videoTrack);
       this.localStream.addTrack(newTrack);
-      return newFacing;
+      const resultFacing = newTrack.getSettings().facingMode || newFacing;
+      console.log('[WebRTC:pc] switchCamera: success, new facingMode =', resultFacing);
+      return resultFacing;
     } catch (e) {
       // Camera switch failure is NOT a call-ending error — the peer
       // connection is still alive. Just log and return false so the UI
