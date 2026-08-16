@@ -9,12 +9,12 @@ import { Input } from '@/components/ui/input';
 import { X, ShieldCheck, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toUserError } from '@/lib/userError';
-
-const CATEGORIES = [
-  'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
-  'Medical Certificate', 'Operation Report', 'Discharge Summary', 'Insurance',
-  'Prescription', 'Mental Health', 'Reproductive Health', 'Infectious Disease', 'Genetics',
-];
+import {
+  HEALTH_CATEGORIES,
+  categoryLabel,
+  isSensitiveCategory,
+  defaultShareableCategories,
+} from '@/lib/healthCategories';
 
 const PERMISSIONS = ['read', 'download', 'print', 'share'];
 const EXPIRY_PRESETS = [
@@ -31,7 +31,9 @@ export default function ConsentGrantForm({ onClose, onGranted }) {
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [query, setQuery] = useState('');
   const [doctorId, setDoctorId] = useState(null);
-  const [categories, setCategories] = useState(['Blood Report']);
+  const [categories, setCategories] = useState(() =>
+    defaultShareableCategories(HEALTH_CATEGORIES.map(c => c.key)).slice(0, 1)
+  );
   const [permissions, setPermissions] = useState(['read']);
   const [expiryPreset, setExpiryPreset] = useState(24);
   const [customExpiry, setCustomExpiry] = useState('');
@@ -138,13 +140,17 @@ export default function ConsentGrantForm({ onClose, onGranted }) {
           <div>
             <Label className="text-xs">Record categories</Label>
             <div className="flex flex-wrap gap-1.5 mt-1">
-              {CATEGORIES.map(c => (
-                <button key={c} onClick={() => toggle(categories, setCategories, c)}
-                  className={cn('px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all',
-                    categories.includes(c) ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-secondary')}>
-                  {c}
-                </button>
-              ))}
+              {HEALTH_CATEGORIES.map(({ key }) => {
+                const sensitive = isSensitiveCategory(key);
+                return (
+                  <button key={key} onClick={() => toggle(categories, setCategories, key)}
+                    className={cn('px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all',
+                      categories.includes(key) ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-secondary',
+                      sensitive && !categories.includes(key) && 'border-dashed')}>
+                    {categoryLabel(key)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

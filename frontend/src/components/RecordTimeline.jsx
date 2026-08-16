@@ -1,25 +1,26 @@
 import React from 'react';
-import { FileText, FileImage, Pill, Syringe, Stethoscope, HeartPulse, ShieldAlert, FileCheck, Brain, Baby, Dna, Coins } from 'lucide-react';
+import { FileText, FileImage, Pill, Syringe, Stethoscope, HeartPulse, ShieldAlert, FileCheck, Brain, Baby, Dna, Coins, Activity, Watch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRecordDate, monthKey } from '@/lib/recordDate';
+import { categoryLabel } from '@/lib/healthCategories';
 
 const categoryMeta = {
-  'Blood Report': { icon: HeartPulse, color: 'text-rose-600 bg-rose-50' },
-  'X-Ray': { icon: FileImage, color: 'text-blue-600 bg-blue-50' },
-  'MRI': { icon: FileImage, color: 'text-indigo-600 bg-indigo-50' },
-  'CT Scan': { icon: FileImage, color: 'text-amber-600 bg-amber-50' },
-  'ECG': { icon: HeartPulse, color: 'text-red-600 bg-red-50' },
-  'Ultrasound': { icon: FileImage, color: 'text-teal-600 bg-teal-50' },
-  'Vaccination': { icon: Syringe, color: 'text-indigo-600 bg-indigo-50' },
-  'Medical Certificate': { icon: FileCheck, color: 'text-slate-600 bg-slate-50' },
-  'Operation Report': { icon: Stethoscope, color: 'text-orange-600 bg-orange-50' },
-  'Discharge Summary': { icon: FileText, color: 'text-teal-600 bg-teal-50' },
-  'Insurance': { icon: Coins, color: 'text-emerald-600 bg-emerald-50' },
-  'Prescription': { icon: Pill, color: 'text-violet-600 bg-violet-50' },
-  'Mental Health': { icon: Brain, color: 'text-fuchsia-600 bg-fuchsia-50' },
-  'Reproductive Health': { icon: Baby, color: 'text-pink-600 bg-pink-50' },
-  'Infectious Disease': { icon: ShieldAlert, color: 'text-red-600 bg-red-50' },
-  'Genetics': { icon: Dna, color: 'text-cyan-600 bg-cyan-50' },
+  'allergies_intolerances': { icon: ShieldAlert, color: 'text-rose-600 bg-rose-50' },
+  'current_medications': { icon: Pill, color: 'text-violet-600 bg-violet-50' },
+  'previous_medications': { icon: Pill, color: 'text-violet-600 bg-violet-50' },
+  'diagnoses': { icon: Stethoscope, color: 'text-red-600 bg-red-50' },
+  'laboratory_results': { icon: HeartPulse, color: 'text-rose-600 bg-rose-50' },
+  'imaging': { icon: FileImage, color: 'text-blue-600 bg-blue-50' },
+  'vaccinations': { icon: Syringe, color: 'text-indigo-600 bg-indigo-50' },
+  'procedures_surgeries': { icon: Stethoscope, color: 'text-orange-600 bg-orange-50' },
+  'mental_health': { icon: Brain, color: 'text-fuchsia-600 bg-fuchsia-50' },
+  'reproductive_health': { icon: Baby, color: 'text-pink-600 bg-pink-50' },
+  'infectious_disease': { icon: ShieldAlert, color: 'text-red-600 bg-red-50' },
+  'genetic_information': { icon: Dna, color: 'text-cyan-600 bg-cyan-50' },
+  'wearable_data': { icon: Watch, color: 'text-cyan-600 bg-cyan-50' },
+  'medication_adherence': { icon: Activity, color: 'text-green-600 bg-green-50' },
+  'uploaded_documents': { icon: FileCheck, color: 'text-slate-600 bg-slate-50' },
+  'chat_clinical_notes': { icon: FileText, color: 'text-teal-600 bg-teal-50' },
 };
 
 export function categoryIcon(category) {
@@ -77,7 +78,7 @@ export default function RecordTimeline({ records, onOpen }) {
                             <span className="text-[10px] text-muted-foreground font-mono whitespace-nowrap">{formatRecordDate(rec)}</span>
                           </div>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
-                            {rec.category}
+                            {categoryLabel(rec.category)}
                             {rec.doctor_name ? ` · ${rec.doctor_name}` : ''}
                             {rec.source_hospital ? ` · ${rec.source_hospital}` : rec.hospital ? ` · ${rec.hospital}` : ''}
                           </p>

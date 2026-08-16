@@ -9,18 +9,25 @@ import {
 } from 'lucide-react';
 import { cn, authFileUrl } from '@/lib/utils';
 import MedicationAdherence from '@/components/MedicationAdherence';
+import { categoryLabel } from '@/lib/healthCategories';
 
 const categoryColors = {
-  'Blood Report': 'text-rose-600 bg-rose-100',
-  'X-Ray': 'text-blue-600 bg-blue-100',
-  'MRI': 'text-purple-600 bg-purple-100',
-  'CT Scan': 'text-amber-600 bg-amber-100',
-  'ECG': 'text-red-600 bg-red-100',
-  'Ultrasound': 'text-cyan-600 bg-cyan-100',
-  'Vaccination': 'text-indigo-600 bg-indigo-100',
-  'Prescription': 'text-indigo-600 bg-indigo-100',
-  'Operation Report': 'text-orange-600 bg-orange-100',
-  'Discharge Summary': 'text-teal-600 bg-teal-100',
+  allergies_intolerances: 'text-rose-600 bg-rose-100',
+  current_medications: 'text-indigo-600 bg-indigo-100',
+  previous_medications: 'text-indigo-600 bg-indigo-100',
+  diagnoses: 'text-purple-600 bg-purple-100',
+  laboratory_results: 'text-rose-600 bg-rose-100',
+  imaging: 'text-blue-600 bg-blue-100',
+  vaccinations: 'text-indigo-600 bg-indigo-100',
+  procedures_surgeries: 'text-orange-600 bg-orange-100',
+  mental_health: 'text-pink-600 bg-pink-100',
+  reproductive_health: 'text-fuchsia-600 bg-fuchsia-100',
+  infectious_disease: 'text-red-600 bg-red-100',
+  genetic_information: 'text-amber-600 bg-amber-100',
+  wearable_data: 'text-teal-600 bg-teal-100',
+  medication_adherence: 'text-cyan-600 bg-cyan-100',
+  uploaded_documents: 'text-slate-600 bg-slate-100',
+  chat_clinical_notes: 'text-emerald-600 bg-emerald-100',
 };
 
 const tabs = [
@@ -295,7 +302,7 @@ function OverviewTab({ patientId, patientName, patientAge, patientGender, record
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{rec.title}</p>
-                    <p className="text-[11px] text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
+                    <p className="text-[11px] text-muted-foreground">{categoryLabel(rec.category)} · {formatRecordDate(rec)}</p>
                   </div>
                   {rec.file_url && (
                     <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline shrink-0">
@@ -337,7 +344,7 @@ function RecordsTab({ records }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{rec.title}</p>
-              <p className="text-xs text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
+              <p className="text-xs text-muted-foreground">{categoryLabel(rec.category)} · {formatRecordDate(rec)}</p>
               {rec.doctor_name && <p className="text-[10px] text-muted-foreground mt-0.5">Dr. {rec.doctor_name}</p>}
               {rec.hospital && <p className="text-[10px] text-muted-foreground">{rec.hospital}</p>}
             </div>

@@ -4,18 +4,25 @@ import { getIncomingSharedData } from '@/lib/familyAccess';
 import EmptyState from '@/components/EmptyState';
 import { cn } from '@/lib/utils';
 import { formatRecordDate } from '@/lib/recordDate';
+import { categoryLabel } from '@/lib/healthCategories';
 
 const categoryColors = {
-  'Blood Report': 'text-rose-600 bg-rose-50',
-  'X-Ray': 'text-blue-600 bg-blue-50',
-  'MRI': 'text-indigo-600 bg-indigo-50',
-  'CT Scan': 'text-amber-600 bg-amber-50',
-  'ECG': 'text-red-600 bg-red-50',
-  'Ultrasound': 'text-teal-600 bg-teal-50',
-  'Vaccination': 'text-indigo-600 bg-indigo-50',
-  'Prescription': 'text-indigo-600 bg-indigo-50',
-  'Operation Report': 'text-orange-600 bg-orange-50',
-  'Discharge Summary': 'text-teal-600 bg-teal-50',
+  allergies_intolerances: 'text-rose-600 bg-rose-50',
+  current_medications: 'text-indigo-600 bg-indigo-50',
+  previous_medications: 'text-indigo-600 bg-indigo-50',
+  diagnoses: 'text-purple-600 bg-purple-50',
+  laboratory_results: 'text-rose-600 bg-rose-50',
+  imaging: 'text-blue-600 bg-blue-50',
+  vaccinations: 'text-indigo-600 bg-indigo-50',
+  procedures_surgeries: 'text-orange-600 bg-orange-50',
+  mental_health: 'text-pink-600 bg-pink-50',
+  reproductive_health: 'text-fuchsia-600 bg-fuchsia-50',
+  infectious_disease: 'text-red-600 bg-red-50',
+  genetic_information: 'text-amber-600 bg-amber-50',
+  wearable_data: 'text-teal-600 bg-teal-50',
+  medication_adherence: 'text-cyan-600 bg-cyan-50',
+  uploaded_documents: 'text-slate-600 bg-slate-50',
+  chat_clinical_notes: 'text-emerald-600 bg-emerald-50',
 };
 
 export default function SharedRecordsList() {
@@ -80,7 +87,7 @@ export default function SharedRecordsList() {
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">
                 <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', catColor)}>
-                  {rec.category}
+                  {categoryLabel(rec.category)}
                 </span>
                 {rec.file_url && (
                   <a href={rec.file_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline">

@@ -12,12 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { UploadCloud, FileText, Wand2, CheckCircle2, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toUserError } from '@/lib/userError';
-
-const CATEGORIES = [
-  'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
-  'Medical Certificate', 'Operation Report', 'Discharge Summary', 'Insurance',
-  'Prescription', 'Mental Health', 'Reproductive Health', 'Infectious Disease', 'Genetics',
-];
+import { HEALTH_CATEGORIES, HEALTH_CATEGORY_KEYS, categoryLabel } from '@/lib/healthCategories';
 
 const STEPS = ['Upload', 'Extract', 'Review', 'Done'];
 
@@ -32,7 +27,7 @@ export default function ImportRecord() {
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    title: '', category: 'Blood Report', date: new Date().toISOString().split('T')[0],
+    title: '', category: 'laboratory_results', date: new Date().toISOString().split('T')[0],
     date_precision: 'day', doctor_name: '', source_hospital: '', notes: '',
   });
   const [savedId, setSavedId] = useState(null);
@@ -74,10 +69,23 @@ export default function ImportRecord() {
         },
       });
       const out = res?.output || {};
+      // Map AI-extracted category to a valid backend enum key
+      let extractedCategory = prev.category;
+      if (out.category) {
+        if (HEALTH_CATEGORY_KEYS.includes(out.category)) {
+          extractedCategory = out.category;
+        } else {
+          // Try to match by label (AI might return a human-readable label)
+          const match = HEALTH_CATEGORIES.find(
+            c => c.label.toLowerCase() === out.category.toLowerCase()
+          );
+          if (match) extractedCategory = match.key;
+        }
+      }
       setForm(prev => ({
         ...prev,
         title: out.title || prev.title,
-        category: CATEGORIES.includes(out.category) ? out.category : prev.category,
+        category: extractedCategory,
         date: out.date || prev.date,
         date_precision: ['day', 'month', 'year'].includes(out.date_precision) ? out.date_precision : prev.date_precision,
         doctor_name: out.doctor_name || prev.doctor_name,
@@ -183,7 +191,7 @@ export default function ImportRecord() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Category">
                 <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {HEALTH_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
               </Field>
               <Field label="Date precision">

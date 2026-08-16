@@ -3,17 +3,16 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toUserError } from '@/lib/userError';
+import {
+  HEALTH_CATEGORIES,
+  categoryLabel,
+  isSensitiveCategory,
+} from '@/lib/healthCategories';
 
 const scopes = [
   { value: 'booking', label: 'Book appointments', hint: 'Can book appointments on your behalf' },
   { value: 'payment', label: 'Make payments', hint: 'Can pay for appointments/services' },
   { value: 'record_view', label: 'View records', hint: 'Can view selected record categories' },
-];
-
-const recordCategories = [
-  'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
-  'Prescription', 'Operation Report', 'Discharge Summary', 'Insurance',
-  'Mental Health', 'Reproductive Health', 'Infectious Disease', 'Genetics',
 ];
 
 export default function DelegationForm({ members, onGrant, onClose }) {
@@ -73,8 +72,8 @@ export default function DelegationForm({ members, onGrant, onClose }) {
             <div>
               <Label className="text-xs">Record categories</Label>
               <div className="mt-1 flex flex-wrap gap-1.5">
-                {recordCategories.map((c) => (
-                  <button key={c} onClick={() => toggleCat(c)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${cats.includes(c) ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'}`}>{c}</button>
+                {HEALTH_CATEGORIES.map(({ key }) => (
+                  <button key={key} onClick={() => toggleCat(key)} className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${cats.includes(key) ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'} ${isSensitiveCategory(key) && !cats.includes(key) ? 'border-dashed' : ''}`}>{categoryLabel(key)}</button>
                 ))}
               </div>
             </div>

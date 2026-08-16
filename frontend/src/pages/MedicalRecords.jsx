@@ -13,20 +13,25 @@ import { formatRecordDate } from '@/lib/recordDate';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const categories = ['All', 'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination', 'Prescription', 'Operation Report', 'Discharge Summary'];
+import { HEALTH_CATEGORIES, categoryLabel } from '@/lib/healthCategories';
 
 const categoryColors = {
-  'Blood Report': 'text-rose-600 bg-rose-50',
-  'X-Ray': 'text-blue-600 bg-blue-50',
-  'MRI': 'text-indigo-600 bg-indigo-50',
-  'CT Scan': 'text-amber-600 bg-amber-50',
-  'ECG': 'text-red-600 bg-red-50',
-  'Ultrasound': 'text-teal-600 bg-teal-50',
-  'Vaccination': 'text-indigo-600 bg-indigo-50',
-  'Prescription': 'text-indigo-600 bg-indigo-50',
-  'Operation Report': 'text-orange-600 bg-orange-50',
-  'Discharge Summary': 'text-teal-600 bg-teal-50',
+  'allergies_intolerances': 'text-rose-600 bg-rose-50',
+  'current_medications': 'text-indigo-600 bg-indigo-50',
+  'previous_medications': 'text-indigo-600 bg-indigo-50',
+  'diagnoses': 'text-red-600 bg-red-50',
+  'laboratory_results': 'text-rose-600 bg-rose-50',
+  'imaging': 'text-blue-600 bg-blue-50',
+  'vaccinations': 'text-indigo-600 bg-indigo-50',
+  'procedures_surgeries': 'text-orange-600 bg-orange-50',
+  'mental_health': 'text-purple-600 bg-purple-50',
+  'reproductive_health': 'text-pink-600 bg-pink-50',
+  'infectious_disease': 'text-amber-600 bg-amber-50',
+  'genetic_information': 'text-teal-600 bg-teal-50',
+  'wearable_data': 'text-cyan-600 bg-cyan-50',
+  'medication_adherence': 'text-green-600 bg-green-50',
+  'uploaded_documents': 'text-teal-600 bg-teal-50',
+  'chat_clinical_notes': 'text-slate-600 bg-slate-50',
 };
 
 export default function MedicalRecords() {
@@ -41,7 +46,7 @@ export default function MedicalRecords() {
   const [showShare, setShowShare] = useState(false);
   const [authKey, setAuthKey] = useState(0);
   const [pendingFile, setPendingFile] = useState(null);
-  const [pickCategory, setPickCategory] = useState(categories[1]);
+  const [pickCategory, setPickCategory] = useState(HEALTH_CATEGORIES[0].key);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
@@ -63,7 +68,7 @@ export default function MedicalRecords() {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    setPickCategory(categories[1]);
+    setPickCategory(HEALTH_CATEGORIES[0].key);
     setPendingFile(file);
   };
 
@@ -82,7 +87,7 @@ export default function MedicalRecords() {
         file_type: file.type,
         notes: 'Uploaded by patient',
       });
-      toast({ title: 'Record uploaded', description: `${file.name} has been added as ${pickCategory}.` });
+      toast({ title: 'Record uploaded', description: `${file.name} has been added as ${categoryLabel(pickCategory)}.` });
       setPendingFile(null);
       load();
     } catch (err) {
@@ -190,7 +195,7 @@ export default function MedicalRecords() {
                       <DoctorAvatar name={rec.doctor_name || rec.patient_name} size="md" round />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm">{rec.doctor_name || rec.title}</p>
-                        <p className="text-xs text-muted-foreground">{rec.category} · {formatRecordDate(rec)}</p>
+                        <p className="text-xs text-muted-foreground">{categoryLabel(rec.category)} · {formatRecordDate(rec)}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -236,18 +241,29 @@ export default function MedicalRecords() {
 
               {/* Category Filter */}
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin pb-1 mb-3">
-                {categories.map(cat => (
+                <button
+                  onClick={() => setCategory('All')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all active:scale-95',
+                    category === 'All'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-muted-foreground border border-border hover:bg-secondary'
+                  )}
+                >
+                  All
+                </button>
+                {HEALTH_CATEGORIES.map(cat => (
                   <button
-                    key={cat}
-                    onClick={() => setCategory(cat)}
+                    key={cat.key}
+                    onClick={() => setCategory(cat.key)}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all active:scale-95',
-                      category === cat
+                      category === cat.key
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-card text-muted-foreground border border-border hover:bg-secondary'
                     )}
                   >
-                    {cat}
+                    {cat.label}
                   </button>
                 ))}
               </div>
@@ -274,7 +290,7 @@ export default function MedicalRecords() {
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">
                           <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', catColor)}>
-                            {rec.category}
+                            {categoryLabel(rec.category)}
                           </span>
                           {rec.file_url && (
                             <a href={authFileUrl(rec.file_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary font-medium hover:underline">
@@ -328,19 +344,19 @@ export default function MedicalRecords() {
                 <p className="text-sm truncate">{pendingFile.name}</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {categories.filter((c) => c !== 'All').map((cat) => (
+                {HEALTH_CATEGORIES.map((cat) => (
                   <button
-                    key={cat}
+                    key={cat.key}
                     type="button"
-                    onClick={() => setPickCategory(cat)}
+                    onClick={() => setPickCategory(cat.key)}
                     className={cn(
                       'px-3 py-2 rounded-xl text-xs font-medium border transition-all text-left',
-                      pickCategory === cat
+                      pickCategory === cat.key
                         ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border text-muted-foreground hover:bg-secondary'
                     )}
                   >
-                    {cat}
+                    {cat.label}
                   </button>
                 ))}
               </div>
@@ -350,7 +366,7 @@ export default function MedicalRecords() {
                 className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-60"
               >
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                {uploading ? 'Uploading…' : `Upload as ${pickCategory}`}
+                {uploading ? 'Uploading…' : `Upload as ${categoryLabel(pickCategory)}`}
               </button>
             </div>
           </div>

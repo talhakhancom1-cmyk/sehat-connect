@@ -1,11 +1,9 @@
 import { base44 } from '@/api/base44Client';
+import { HEALTH_CATEGORY_KEYS } from '@/lib/healthCategories';
 
-// Canonical record categories (mirrors the DelegationForm taxonomy)
-export const RECORD_CATEGORIES = [
-  'Blood Report', 'X-Ray', 'MRI', 'CT Scan', 'ECG', 'Ultrasound', 'Vaccination',
-  'Prescription', 'Operation Report', 'Discharge Summary', 'Insurance',
-  'Mental Health', 'Reproductive Health', 'Infectious Disease', 'Genetics',
-];
+// Canonical record categories — backend enum keys (single source of truth:
+// lib/healthCategories.js). Re-exported here for backward compatibility.
+export const RECORD_CATEGORIES = HEALTH_CATEGORY_KEYS;
 
 export const HEALTH_CARD_TYPES = [
   { value: 'emergency', label: 'Emergency' },
