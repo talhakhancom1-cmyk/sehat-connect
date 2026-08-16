@@ -57,7 +57,7 @@
 @layer base {
   * { @apply border-border; }
   html, body { height: 100%; }
-  #root { min-height: 100%; }
+  #root { height: 100%; }
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -68,6 +68,7 @@
     overscroll-behavior-y: none;
     -webkit-text-size-adjust: 100%;
     overflow-x: hidden;
+    overflow-y: hidden;
   }
   /* Prevent horizontal scrolling on mobile */
   img, video, canvas, svg { max-width: 100%; }

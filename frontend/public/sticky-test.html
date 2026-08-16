@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticky Header Test</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { height: 100%; margin: 0; }
+  #root { height: 100%; }
+  body { overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="root">
+  <!-- Layout root: h-screen + overflow-hidden -->
+  <div class="h-screen flex bg-gray-100 overflow-hidden">
+
+    <!-- Sidebar (hidden on mobile) -->
+    <div class="hidden lg:flex w-64 bg-gray-200 p-4">Sidebar</div>
+
+    <!-- Right side: flex column, h-full, overflow-hidden -->
+    <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+
+      <!-- TopBar (sticky but in non-scrolling container, so just stays) -->
+      <header class="sticky top-0 z-30 bg-white border-b border-gray-300 p-4 flex items-center justify-between">
+        <span class="font-bold">TopBar</span>
+        <span class="text-sm text-gray-500">EcoHealth</span>
+      </header>
+
+      <!-- Main: flex-1, min-h-0, overflow-y-auto — THIS is the scroll container -->
+      <main class="flex-1 p-4 overflow-y-auto min-h-0">
+
+        <!-- Chat wrapper: flex column (NO animate-fade-in, NO transform) -->
+        <div class="flex flex-col">
+
+          <!-- Header: sticky top-0 — should stick to top of main's scrollport -->
+          <div class="sticky top-0 z-20 bg-white flex items-center gap-3 pb-3 border-b border-gray-300">
+            <button class="p-2 rounded-full hover:bg-gray-100">←</button>
+            <div class="w-10 h-10 rounded-full bg-blue-500"></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-sm">Salar Khan</p>
+              <p class="text-xs text-gray-500">Conversation</p>
+            </div>
+            <button class="p-2 rounded-full bg-blue-100 text-blue-600">📞</button>
+            <button class="p-2 rounded-full bg-blue-100 text-blue-600">📹</button>
+          </div>
+
+          <!-- Messages: only this should scroll -->
+          <div class="py-4 space-y-2">
+            <!-- Generate 50 fake messages to force scrolling -->
+            <script>
+              document.write(Array.from({length: 50}, (_, i) =>
+                `<div class="flex ${i % 2 === 0 ? 'justify-end' : 'justify-start'}">
+                  <div class="max-w-[75%] px-3 py-2 rounded-2xl text-sm ${i % 2 === 0 ? 'bg-blue-500 text-white' : 'bg-gray-200'}">
+                    Message ${i + 1}: This is a test message to verify the sticky header stays visible while scrolling.
+                  </div>
+                </div>`
+              ).join(''));
+            </script>
+          </div>
+
+          <!-- Input: sticky bottom-0 — should stick to bottom of main's scrollport -->
+          <div class="sticky bottom-0 z-20 bg-white flex items-center gap-2 pt-3 border-t border-gray-300">
+            <input type="text" placeholder="Type a message…" class="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-sm">
+            <button class="p-2 rounded-xl bg-blue-500 text-white">Send</button>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</body>
+</html>
