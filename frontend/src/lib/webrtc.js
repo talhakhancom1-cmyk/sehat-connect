@@ -207,85 +207,80 @@ export class WebRTCCall {
     if (!this.localStream) return false;
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (!videoTrack) return false;
-    const settings = videoTrack.getSettings();
-    const facingMode = settings.facingMode;
-    console.log('[WebRTC:pc] switchCamera: current facingMode =', facingMode, 'label =', videoTrack.label);
 
-    // facingMode is often undefined on iOS Safari. If we can't determine
-    // the current facing, enumerate devices and pick a different camera.
-    let newFacing = facingMode === 'user' ? 'environment' : 'user';
+    const currentLabel = videoTrack.label;
+    const currentFacing = videoTrack.getSettings().facingMode;
+    console.log('[WebRTC:pc] switchCamera: current camera =', currentLabel, 'facingMode =', currentFacing);
 
     try {
-      let newStream = null;
+      // ---- Strategy: enumerate ALL video devices, pick a genuinely different one ----
+      // We can't rely on facingMode because iOS Safari often returns undefined.
+      // We can't rely on track.id because getUserMedia creates a new track object
+      // even for the same physical camera. So we match by device label.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      console.log('[WebRTC:pc] switchCamera: found', videoInputs.length, 'video devices:',
+        videoInputs.map(d => `"${d.label || 'unlabeled'}" (id: ${d.deviceId.substring(0, 8)}...)`));
 
-      // Attempt 1: Try the opposite facingMode
+      if (videoInputs.length < 2) {
+        console.warn('[WebRTC:pc] switchCamera: only', videoInputs.length, 'video device(s) found, cannot switch');
+        return false;
+      }
+
+      // Find a camera that is NOT the current one (match by label)
+      let targetDevice = videoInputs.find(d => d.label && d.label !== currentLabel);
+
+      // If labels are empty (can happen before permission grant), alternate by index
+      if (!targetDevice) {
+        // Track which device index we're on by matching the current track's label
+        // against the device list. If we can't match, just try the next index.
+        const currentIndex = videoInputs.findIndex(d => d.label === currentLabel);
+        const nextIndex = (currentIndex + 1) % videoInputs.length;
+        targetDevice = videoInputs[nextIndex];
+        console.log('[WebRTC:pc] switchCamera: label match failed, alternating index', currentIndex, '→', nextIndex);
+      }
+
+      if (!targetDevice) {
+        console.warn('[WebRTC:pc] switchCamera: no target device found');
+        return false;
+      }
+
+      console.log('[WebRTC:pc] switchCamera: target device =', `"${targetDevice.label || 'unlabeled'}"`, 'id:', targetDevice.deviceId.substring(0, 8) + '...');
+
+      // Acquire the new camera by deviceId. Do NOT stop the old track yet —
+      // we need to confirm the new camera is actually different first.
+      let newStream;
       try {
-        console.log('[WebRTC:pc] switchCamera: trying facingMode =', newFacing);
         newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: newFacing } },
+          video: { deviceId: { exact: targetDevice.deviceId } },
           audio: false,
         });
       } catch (e1) {
-        console.log('[WebRTC:pc] switchCamera: exact facingMode failed:', e1.message);
-
-        // Attempt 2: Try with facingMode (non-exact)
-        try {
-          newStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: newFacing },
-            audio: false,
-          });
-        } catch (e2) {
-          console.log('[WebRTC:pc] switchCamera: non-exact facingMode failed:', e2.message);
-
-          // Attempt 3: Enumerate devices and pick a different camera by deviceId
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoInputs = devices.filter(d => d.kind === 'videoinput');
-          console.log('[WebRTC:pc] switchCamera: found', videoInputs.length, 'video devices:',
-            videoInputs.map(d => d.label || 'unlabeled'));
-
-          // Find a camera that's NOT the current one
-          const otherCameras = videoInputs.filter(d => d.label && d.label !== videoTrack.label);
-          if (otherCameras.length > 0) {
-            console.log('[WebRTC:pc] switchCamera: trying deviceId =', otherCameras[0].label);
-            newStream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: { exact: otherCameras[0].deviceId } },
-              audio: false,
-            });
-          } else if (videoInputs.length > 1) {
-            // Labels might be empty (pre-permission). Try the second device.
-            console.log('[WebRTC:pc] switchCamera: trying second device by index');
-            newStream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: { exact: videoInputs[1].deviceId } },
-              audio: false,
-            });
-          }
-        }
-      }
-
-      if (!newStream) {
-        // Last resort: just any video device
-        console.log('[WebRTC:pc] switchCamera: falling back to any video device');
+        console.log('[WebRTC:pc] switchCamera: exact deviceId failed:', e1.message, '— trying without exact');
         newStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: { deviceId: targetDevice.deviceId },
           audio: false,
         });
       }
 
       const newTrack = newStream.getVideoTracks()[0];
       if (!newTrack) {
-        console.warn('[WebRTC:pc] switchCamera: no video track in new stream');
+        console.warn('[WebRTC:pc] switchCamera: no video track returned by getUserMedia');
         return false;
       }
 
-      // If we got the same track (same camera), give up
-      if (newTrack.id === videoTrack.id) {
-        console.warn('[WebRTC:pc] switchCamera: got the same camera back, no switch possible');
+      // CRITICAL: Check if we got the same physical camera by comparing labels.
+      // getUserMedia creates a new track object each time, so track.id is useless
+      // for detecting same-camera. Label is the reliable identifier.
+      if (newTrack.label === currentLabel) {
+        console.warn('[WebRTC:pc] switchCamera: got the same camera back (label match):', newTrack.label);
         newTrack.stop();
         return false;
       }
 
-      console.log('[WebRTC:pc] switchCamera: new track =', newTrack.label, 'facingMode =', newTrack.getSettings().facingMode);
+      console.log('[WebRTC:pc] switchCamera: new camera =', newTrack.label, 'facingMode =', newTrack.getSettings().facingMode);
 
+      // NOW we can safely stop the old track and swap in the new one.
       // Replace the track in the peer connection WITHOUT tearing it down.
       // replaceTrack() is the correct API — it swaps the media source while
       // keeping the same RTP sender and SSRC, so the remote peer just sees
@@ -301,8 +296,8 @@ export class WebRTCCall {
       videoTrack.stop();
       this.localStream.removeTrack(videoTrack);
       this.localStream.addTrack(newTrack);
-      const resultFacing = newTrack.getSettings().facingMode || newFacing;
-      console.log('[WebRTC:pc] switchCamera: success, new facingMode =', resultFacing);
+      const resultFacing = newTrack.getSettings().facingMode || 'unknown';
+      console.log('[WebRTC:pc] switchCamera: SUCCESS — switched to', newTrack.label, 'facing =', resultFacing);
       return resultFacing;
     } catch (e) {
       // Camera switch failure is NOT a call-ending error — the peer
