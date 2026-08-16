@@ -222,9 +222,9 @@ export default function ChatThread() {
 
   return (
     <Layout role={role}>
-      <div className="flex flex-col h-[calc(100vh-200px)] lg:h-[calc(100vh-120px)] animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center gap-3 pb-3 border-b border-border">
+      <div className="flex flex-col animate-fade-in">
+        {/* Header — sticky so call buttons stay accessible at any scroll position */}
+        <div className="sticky top-0 z-20 bg-background flex items-center gap-3 pb-3 border-b border-border">
           <button onClick={() => navigate('/chat')} className="p-2 rounded-full hover:bg-secondary active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -249,8 +249,8 @@ export default function ChatThread() {
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin py-4 space-y-2">
+        {/* Messages — scrolls within the Layout's main scroll container */}
+        <div className="py-4 space-y-2">
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3, 4].map(i => (
@@ -319,8 +319,8 @@ export default function ChatThread() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="flex items-center gap-2 pt-3 border-t border-border">
+        {/* Input — sticky so it stays visible at the bottom of the scroll area */}
+        <div className="sticky bottom-0 z-20 bg-background flex items-center gap-2 pt-3 border-t border-border">
           <VoiceRecorder onSend={handleSendVoice} disabled={sending || !conversation} />
           <input
             type="text"
