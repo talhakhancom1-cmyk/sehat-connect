@@ -50,9 +50,10 @@ export default function AudioOutputPicker({
 
   if (!supported || devices.length <= 1) {
     // Nothing to switch — show a static icon (or nothing in compact mode).
+    console.log('[AudioOutputPicker] disabled state:', { supported, deviceCount: devices.length });
     if (compact) return null;
     return (
-      <div className="p-3.5 sm:p-4 rounded-full bg-white/10 text-white/50 cursor-default" title="Audio output switching not supported on this browser">
+      <div className="p-3.5 sm:p-4 rounded-full bg-white/10 text-white/50 cursor-default" title={supported ? 'Only one audio output device available' : 'Audio output switching not supported on this browser'}>
         <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
     );

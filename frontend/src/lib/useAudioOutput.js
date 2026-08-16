@@ -58,6 +58,8 @@ export function useAudioOutput() {
       if (!navigator.mediaDevices?.enumerateDevices) return;
       const devices = await navigator.mediaDevices.enumerateDevices();
       const outputs = devices.filter((d) => d.kind === 'audiooutput');
+      console.log('[useAudioOutput] enumerated', outputs.length, 'audio output devices:',
+        outputs.map(d => `"${d.label || 'unlabeled'}" (id: ${d.deviceId.substring(0, 12)}...)`));
       setOutputDevices(outputs);
 
       // Auto-select a sensible default on first load:
@@ -68,9 +70,10 @@ export function useAudioOutput() {
         const earpiece = outputs.find((d) => classifyDevice(d.label) === 'earpiece');
         const preferred = bluetooth || headset || earpiece || outputs[0];
         setSelectedDeviceId(preferred.deviceId);
+        console.log('[useAudioOutput] auto-selected:', `"${preferred.label || 'default'}"`);
       }
-    } catch {
-      /* ignore — permissions may not be granted yet */
+    } catch (e) {
+      console.warn('[useAudioOutput] enumerateDevices failed:', e.message);
     }
   }, [selectedDeviceId, classifyDevice]);
 
@@ -98,9 +101,11 @@ export function useAudioOutput() {
     async (el) => {
       if (!el) return;
       lastElementRef.current = el;
+      console.log('[useAudioOutput] applyToElement called, supported =', supported, 'selectedDeviceId =', selectedDeviceId);
       if (!supported || !selectedDeviceId) return;
       try {
         await el.setSinkId(selectedDeviceId);
+        console.log('[useAudioOutput] setSinkId succeeded:', selectedDeviceId);
         setSinkError(null);
       } catch (e) {
         console.warn('[useAudioOutput] setSinkId failed:', e.name, e.message);
@@ -113,14 +118,22 @@ export function useAudioOutput() {
   // When the selected device changes, re-apply to the last element.
   const selectDevice = useCallback(
     (id) => {
+      console.log('[useAudioOutput] selectDevice called with id =', id);
       setSelectedDeviceId(id);
       setSinkError(null);
       if (lastElementRef.current && supported) {
+        console.log('[useAudioOutput] calling setSinkId on element:', lastElementRef.current.tagName);
         lastElementRef.current.setSinkId(id).then(() => {
+          console.log('[useAudioOutput] setSinkId succeeded on select:', id);
           setSinkError(null);
         }).catch((e) => {
           console.warn('[useAudioOutput] setSinkId failed on select:', e.name, e.message);
           setSinkError(e.name === 'NotFoundError' ? 'Selected audio device not found' : e.message);
+        });
+      } else {
+        console.warn('[useAudioOutput] selectDevice: no element ref or not supported', {
+          hasElement: !!lastElementRef.current,
+          supported,
         });
       }
     },

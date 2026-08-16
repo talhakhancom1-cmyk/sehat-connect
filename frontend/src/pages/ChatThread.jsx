@@ -222,7 +222,7 @@ export default function ChatThread() {
 
   return (
     <Layout role={role}>
-      <div className="flex flex-col animate-fade-in">
+      <div className="flex flex-col">
         {/* Header — sticky so call buttons stay accessible at any scroll position */}
         <div className="sticky top-0 z-20 bg-background flex items-center gap-3 pb-3 border-b border-border">
           <button onClick={() => navigate('/chat')} className="p-2 rounded-full hover:bg-secondary active:scale-95 transition-all">
